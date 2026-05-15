@@ -10,6 +10,9 @@ object Routes {
     const val SETTINGS = "settings"
     const val PROFILE = "profile"
     const val SUBSCRIPTION = "subscription"
+    const val DASHBOARD = "dashboard"
+    const val QUIZ = "quiz"
+    const val REVIEW = "review"
 
     fun chatConversation(conversationId: Long) = "chat/$conversationId"
 }

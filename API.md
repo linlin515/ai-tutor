@@ -29,18 +29,12 @@ POST /api/v1/auth/register
   "code": 0,
   "message": "注册成功",
   "data": {
-    "token": "eyJhbGciOiJIUzI1NiIs...",
-    "user": {
-      "id": 1,
-      "phone": "13800138000",
-      "nickname": "同学",
-      "avatar": null,
-      "grade": null,
-      "daily_quota": 5,
-      "daily_used": 0,
-      "is_subscribed": false,
-      "subscription_expire": null
-    }
+    "access_token": "eyJhbG...NiIs...",
+    "token_type": "bearer",
+    "user_id": "c2e8305b-9469-4c51-9eaf-d6ce902e28e5",
+    "nickname": "学伴_8000",
+    "daily_quota": 5,
+    "daily_used": 0
   }
 }
 ```

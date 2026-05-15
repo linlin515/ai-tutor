@@ -2,8 +2,12 @@ package com.aitutor.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.aitutor.app.data.local.dao.AnalyticsDao
 import com.aitutor.app.data.local.dao.ConversationDao
 import com.aitutor.app.data.local.dao.MessageDao
+import com.aitutor.app.data.local.dao.PendingSubmissionDao
+import com.aitutor.app.data.local.dao.QuizRecordDao
+import com.aitutor.app.data.local.dao.WrongAnswerDao
 import com.aitutor.app.data.local.db.AiTutorDatabase
 import dagger.Module
 import dagger.Provides
@@ -38,5 +42,29 @@ object DatabaseModule {
     @Provides
     fun provideMessageDao(database: AiTutorDatabase): MessageDao {
         return database.messageDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAnalyticsDao(database: AiTutorDatabase): AnalyticsDao {
+        return database.analyticsDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideQuizRecordDao(database: AiTutorDatabase): QuizRecordDao {
+        return database.quizRecordDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePendingSubmissionDao(database: AiTutorDatabase): PendingSubmissionDao {
+        return database.pendingSubmissionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideWrongAnswerDao(database: AiTutorDatabase): WrongAnswerDao {
+        return database.wrongAnswerDao()
     }
 }

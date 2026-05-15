@@ -1,13 +1,19 @@
 package com.aitutor.app.di
 
+import com.aitutor.app.data.repository.AnalyticsRepositoryImpl
 import com.aitutor.app.data.repository.AuthRepositoryImpl
 import com.aitutor.app.data.repository.ChatRepositoryImpl
+import com.aitutor.app.data.repository.QuizRepositoryImpl
 import com.aitutor.app.data.repository.SettingsRepositoryImpl
 import com.aitutor.app.data.repository.VoiceRepositoryImpl
+import com.aitutor.app.data.repository.WrongAnswerRepositoryImpl
+import com.aitutor.app.domain.repository.AnalyticsRepository
 import com.aitutor.app.domain.repository.AuthRepository
 import com.aitutor.app.domain.repository.ChatRepository
+import com.aitutor.app.domain.repository.QuizRepository
 import com.aitutor.app.domain.repository.SettingsRepository
 import com.aitutor.app.domain.repository.VoiceRepository
+import com.aitutor.app.domain.repository.WrongAnswerRepository
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -33,4 +39,16 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindSettingsRepository(impl: SettingsRepositoryImpl): SettingsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindAnalyticsRepository(impl: AnalyticsRepositoryImpl): AnalyticsRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindQuizRepository(impl: QuizRepositoryImpl): QuizRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindWrongAnswerRepository(impl: WrongAnswerRepositoryImpl): WrongAnswerRepository
 }

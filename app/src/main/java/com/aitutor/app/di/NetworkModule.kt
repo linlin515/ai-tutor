@@ -1,7 +1,9 @@
 package com.aitutor.app.di
 
 import com.aitutor.app.data.remote.api.AiTutorApi
+import com.aitutor.app.data.remote.api.AnalyticsApi
 import com.aitutor.app.data.remote.api.ChatStreamApi
+import com.aitutor.app.data.remote.api.QuizApi
 import com.aitutor.app.data.remote.interceptor.AuthInterceptor
 import com.aitutor.app.data.remote.interceptor.TokenManager
 import com.aitutor.app.domain.repository.AuthRepository
@@ -75,5 +77,17 @@ object NetworkModule {
     @Singleton
     fun provideChatStreamApi(okHttpClient: OkHttpClient): ChatStreamApi {
         return ChatStreamApi(okHttpClient, BASE_URL)
+    }
+
+    @Provides
+    @Singleton
+    fun provideAnalyticsApi(retrofit: Retrofit): AnalyticsApi {
+        return retrofit.create(AnalyticsApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideQuizApi(retrofit: Retrofit): QuizApi {
+        return retrofit.create(QuizApi::class.java)
     }
 }

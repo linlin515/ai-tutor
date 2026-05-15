@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,6 +32,9 @@ import com.aitutor.app.ui.auth.LoginViewModel
 import com.aitutor.app.ui.profile.ProfileScreen
 import com.aitutor.app.ui.settings.SettingsScreen
 import com.aitutor.app.ui.splash.SplashScreen
+import com.aitutor.app.ui.screen.dashboard.DashboardScreen
+import com.aitutor.app.ui.screen.quiz.QuizScreen
+import com.aitutor.app.ui.screen.review.ReviewScreen
 
 data class BottomNavItem(
     val label: String,
@@ -46,7 +51,9 @@ fun AppNavGraph() {
 
     val bottomNavItems = listOf(
         BottomNavItem("对话", Icons.Default.Chat, Routes.CHAT),
+        BottomNavItem("学习", Icons.Default.BarChart, Routes.DASHBOARD),
         BottomNavItem("解题", Icons.Default.CameraAlt, Routes.SOLVE),
+        BottomNavItem("测验", Icons.Default.MenuBook, Routes.QUIZ),
         BottomNavItem("设置", Icons.Default.Settings, Routes.SETTINGS)
     )
 
@@ -187,6 +194,26 @@ fun AppNavGraph() {
             composable(Routes.SUBSCRIPTION) {
                 SubscriptionPlaceholder(onBack = { navController.popBackStack() })
             }
+
+            composable(Routes.DASHBOARD) {
+                DashboardScreen(
+                    onNavigateToQuiz = {
+                        navController.navigate(Routes.QUIZ)
+                    }
+                )
+            }
+
+            composable(Routes.QUIZ) {
+                QuizScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.REVIEW) {
+                ReviewScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
         }
     }
 }
@@ -200,7 +227,7 @@ fun SubscriptionPlaceholder(onBack: () -> Unit) {
                 title = { Text("订阅管理") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 }
             )

@@ -9,6 +9,9 @@ import com.aitutor.app.ui.camera.CameraViewModel_HiltModules;
 import com.aitutor.app.ui.chat.ChatViewModel_HiltModules;
 import com.aitutor.app.ui.conversation.ConversationViewModel_HiltModules;
 import com.aitutor.app.ui.profile.ProfileViewModel_HiltModules;
+import com.aitutor.app.ui.screen.dashboard.DashboardViewModel_HiltModules;
+import com.aitutor.app.ui.screen.quiz.QuizViewModel_HiltModules;
+import com.aitutor.app.ui.screen.review.ReviewViewModel_HiltModules;
 import com.aitutor.app.ui.settings.SettingsViewModel_HiltModules;
 import com.aitutor.app.ui.splash.SplashViewModel_HiltModules;
 import dagger.Binds;
@@ -170,10 +173,13 @@ public final class AiTutorApp_HiltComponents {
           CameraViewModel_HiltModules.KeyModule.class,
           ChatViewModel_HiltModules.KeyModule.class,
           ConversationViewModel_HiltModules.KeyModule.class,
+          DashboardViewModel_HiltModules.KeyModule.class,
           HiltWrapper_ActivityRetainedComponentManager_LifecycleModule.class,
           HiltWrapper_SavedStateHandleModule.class,
           LoginViewModel_HiltModules.KeyModule.class,
           ProfileViewModel_HiltModules.KeyModule.class,
+          QuizViewModel_HiltModules.KeyModule.class,
+          ReviewViewModel_HiltModules.KeyModule.class,
           SettingsViewModel_HiltModules.KeyModule.class,
           SplashViewModel_HiltModules.KeyModule.class
       }
@@ -214,9 +220,12 @@ public final class AiTutorApp_HiltComponents {
           CameraViewModel_HiltModules.BindsModule.class,
           ChatViewModel_HiltModules.BindsModule.class,
           ConversationViewModel_HiltModules.BindsModule.class,
+          DashboardViewModel_HiltModules.BindsModule.class,
           HiltWrapper_HiltViewModelFactory_ViewModelModule.class,
           LoginViewModel_HiltModules.BindsModule.class,
           ProfileViewModel_HiltModules.BindsModule.class,
+          QuizViewModel_HiltModules.BindsModule.class,
+          ReviewViewModel_HiltModules.BindsModule.class,
           SettingsViewModel_HiltModules.BindsModule.class,
           SplashViewModel_HiltModules.BindsModule.class
       }
