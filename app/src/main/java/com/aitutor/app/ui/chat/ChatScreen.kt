@@ -10,10 +10,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -99,6 +96,15 @@ fun ChatScreen(
                     }
                 },
                 actions = {
+                    // Tutor mode toggle
+                    IconButton(onClick = { viewModel.toggleTutorMode() }) {
+                        Icon(
+                            imageVector = if (state.tutorMode) Icons.Default.School else Icons.Default.Person,
+                            contentDescription = if (state.tutorMode) "引导式教学" else "普通问答",
+                            tint = if (state.tutorMode) MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     IconButton(onClick = { viewModel.createNewConversation() }) {
                         Icon(Icons.Default.Add, contentDescription = "新建对话")
                     }
@@ -132,7 +138,8 @@ fun ChatScreen(
                 // Empty state
                 EmptyStateView(
                     title = "开始一段新的对话吧",
-                    subtitle = "输入问题或点击麦克风语音输入"
+                    subtitle = if (state.tutorMode) "当前为引导式教学模式，AI 会通过提问引导你思考"
+                               else "输入问题或点击麦克风语音输入"
                 )
             } else {
                 // Messages list

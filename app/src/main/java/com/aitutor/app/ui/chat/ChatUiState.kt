@@ -15,5 +15,8 @@ data class ChatUiState(
     val errorMessage: String? = null,
     val voiceState: VoiceState = VoiceState(),
     val showConversationSheet: Boolean = false,
-    val searchKeyword: String = ""
+    val searchKeyword: String = "",
+    // Feature 2 & 3: Adaptive teaching & mode toggle
+    val tutorMode: Boolean = false,
+    val userGrade: String? = null
 )

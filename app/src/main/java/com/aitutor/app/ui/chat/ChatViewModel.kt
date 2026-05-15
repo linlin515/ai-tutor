@@ -35,6 +35,15 @@ class ChatViewModel @Inject constructor(
 
     init {
         loadConversations()
+        loadUserGrade()
+    }
+
+    private fun loadUserGrade() {
+        viewModelScope.launch {
+            authRepository.getProfile().onSuccess { user ->
+                uiState = uiState.copy(userGrade = user.grade)
+            }
+        }
     }
 
     fun loadConversations() {
@@ -77,6 +86,10 @@ class ChatViewModel @Inject constructor(
 
     fun updateInputText(text: String) {
         uiState = uiState.copy(inputText = text)
+    }
+
+    fun toggleTutorMode() {
+        uiState = uiState.copy(tutorMode = !uiState.tutorMode)
     }
 
     fun sendMessage() {
@@ -137,6 +150,15 @@ class ChatViewModel @Inject constructor(
             val contextMessages = chatRepository.getMessagesByConversation(conversationId).first()
                 .filter { it.id != msgId }
 
+            // Determine tutor mode parameters
+            val role = if (uiState.tutorMode) "tutor" else "assistant"
+            val systemPrompt = if (uiState.tutorMode) {
+                val gradeHint = uiState.userGrade?.let { "学生当前年级：$it。请根据该年级水平调整讲解深度。" } ?: ""
+                "你是一个AI学习助手，请用引导式教学方法帮助学生思考和解决问题。采用苏格拉底式提问，逐步引导学生自己找到答案，而不是直接给出答案。$gradeHint"
+            } else {
+                null
+            }
+
             // Stream chat — single job, no race condition
             streamJob = viewModelScope.launch {
                 val accumulatedContent = StringBuilder()
@@ -146,7 +168,10 @@ class ChatViewModel @Inject constructor(
                     modelId = settings.modelId,
                     temperature = settings.temperature,
                     topP = settings.topP,
-                    maxTokens = settings.maxTokens
+                    maxTokens = settings.maxTokens,
+                    grade = uiState.userGrade,
+                    role = role,
+                    systemPrompt = systemPrompt
                 ).collect { chunk ->
                     accumulatedContent.append(chunk)
                     uiState = uiState.copy(streamingContent = accumulatedContent.toString())

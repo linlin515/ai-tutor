@@ -26,8 +26,18 @@ interface ChatRepository {
         modelId: String,
         temperature: Float,
         topP: Float,
-        maxTokens: Int
+        maxTokens: Int,
+        grade: String? = null,
+        role: String? = null,  // "tutor" or "assistant"
+        systemPrompt: String? = null
     ): Flow<String>
+
+    // Image solving
+    suspend fun solvePhoto(
+        imageUri: String,
+        conversationId: Long,
+        grade: String? = null
+    ): Result<String>
 
     // Search
     fun searchMessagesByKeyword(keyword: String): Flow<List<Conversation>>
