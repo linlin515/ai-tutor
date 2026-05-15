@@ -44,7 +44,7 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun register(phone: String, password: String, email: String? = null): Result<User> {
+    override suspend fun register(phone: String, password: String, email: String?): Result<User> {
         return try {
             val response = api.register(AuthRequest(phone, password, email))
             val body = response.body()
