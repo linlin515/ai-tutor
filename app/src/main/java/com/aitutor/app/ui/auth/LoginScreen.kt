@@ -87,6 +87,27 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
+            // Email input (only shown in register mode)
+            if (state.isRegister) {
+                OutlinedTextField(
+                    value = state.email,
+                    onValueChange = { viewModel.updateEmail(it) },
+                    label = { Text("邮箱（选填）") },
+                    placeholder = { Text("请输入邮箱地址") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Email,
+                        imeAction = ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(
+                        onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.isLoading
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
             // Password input
             OutlinedTextField(
                 value = state.password,

@@ -21,8 +21,21 @@ class AuthRepositoryImpl @Inject constructor(
             val response = api.login(AuthRequest(phone, password))
             val body = response.body()
             if (response.isSuccessful && body?.code == 0 && body.data != null) {
-                tokenManager.saveToken(body.data.token)
-                Result.success(body.data.user.toDomain())
+                val authData = body.data
+                tokenManager.saveToken(authData.accessToken)
+                Result.success(
+                    User(
+                        id = authData.userId,
+                        phone = phone,
+                        nickname = authData.nickname ?: "用户${phone.takeLast(4)}",
+                        avatar = null,
+                        grade = null,
+                        dailyQuota = authData.dailyQuota,
+                        dailyUsed = authData.dailyUsed,
+                        isSubscribed = false,
+                        subscriptionExpire = null
+                    )
+                )
             } else {
                 Result.failure(Exception(body?.message ?: "登录失败"))
             }
@@ -31,13 +44,26 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
-    override suspend fun register(phone: String, password: String): Result<User> {
+    override suspend fun register(phone: String, password: String, email: String?): Result<User> {
         return try {
-            val response = api.register(AuthRequest(phone, password))
+            val response = api.register(AuthRequest(phone, password, email))
             val body = response.body()
             if (response.isSuccessful && body?.code == 0 && body.data != null) {
-                tokenManager.saveToken(body.data.token)
-                Result.success(body.data.user.toDomain())
+                val authData = body.data
+                tokenManager.saveToken(authData.accessToken)
+                Result.success(
+                    User(
+                        id = authData.userId,
+                        phone = phone,
+                        nickname = authData.nickname ?: "用户${phone.takeLast(4)}",
+                        avatar = null,
+                        grade = null,
+                        dailyQuota = authData.dailyQuota,
+                        dailyUsed = authData.dailyUsed,
+                        isSubscribed = false,
+                        subscriptionExpire = null
+                    )
+                )
             } else {
                 Result.failure(Exception(body?.message ?: "注册失败"))
             }

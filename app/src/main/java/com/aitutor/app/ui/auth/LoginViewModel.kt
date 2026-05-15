@@ -13,6 +13,7 @@ import javax.inject.Inject
 data class LoginUiState(
     val phone: String = "",
     val password: String = "",
+    val email: String = "",
     val isRegister: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
@@ -35,6 +36,10 @@ class LoginViewModel @Inject constructor(
 
     fun updatePassword(password: String) {
         uiState = uiState.copy(password = password, errorMessage = null)
+    }
+
+    fun updateEmail(email: String) {
+        uiState = uiState.copy(email = email, errorMessage = null)
     }
 
     fun toggleMode() {
@@ -62,7 +67,7 @@ class LoginViewModel @Inject constructor(
 
         viewModelScope.launch {
             val result = if (uiState.isRegister) {
-                authRepository.register(phone, password)
+                authRepository.register(phone, password, uiState.email.ifBlank { null })
             } else {
                 authRepository.login(phone, password)
             }

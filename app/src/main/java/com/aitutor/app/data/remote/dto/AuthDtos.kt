@@ -4,16 +4,21 @@ import com.google.gson.annotations.SerializedName
 
 data class AuthRequest(
     @SerializedName("phone") val phone: String,
-    @SerializedName("password") val password: String
+    @SerializedName("password") val password: String,
+    @SerializedName("email") val email: String? = null
 )
 
 data class AuthResponse(
-    @SerializedName("token") val token: String,
-    @SerializedName("user") val user: UserDto
+    @SerializedName("access_token") val accessToken: String,
+    @SerializedName("token_type") val tokenType: String = "bearer",
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("nickname") val nickname: String? = null,
+    @SerializedName("daily_quota") val dailyQuota: Int = 5,
+    @SerializedName("daily_used") val dailyUsed: Int = 0
 )
 
 data class UserDto(
-    @SerializedName("id") val id: Long,
+    @SerializedName("id") val id: String,
     @SerializedName("phone") val phone: String,
     @SerializedName("nickname") val nickname: String,
     @SerializedName("avatar") val avatar: String?,

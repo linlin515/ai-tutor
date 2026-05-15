@@ -1,7 +1,7 @@
 package com.aitutor.app.domain.model
 
 data class User(
-    val id: Long,
+    val id: String,
     val phone: String,
     val nickname: String,
     val avatar: String?,
