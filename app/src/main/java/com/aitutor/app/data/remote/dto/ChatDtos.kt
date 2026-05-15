@@ -8,7 +8,10 @@ data class ChatCompletionRequest(
     @SerializedName("stream") val stream: Boolean,
     @SerializedName("temperature") val temperature: Float,
     @SerializedName("top_p") val topP: Float,
-    @SerializedName("max_tokens") val maxTokens: Int
+    @SerializedName("max_tokens") val maxTokens: Int,
+    @SerializedName("grade") val grade: String? = null,
+    @SerializedName("role") val role: String? = null,  // "tutor" or "assistant"
+    @SerializedName("system_prompt") val systemPrompt: String? = null
 )
 
 data class ChatMessageDto(

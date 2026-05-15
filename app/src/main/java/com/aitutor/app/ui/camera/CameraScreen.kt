@@ -25,9 +25,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import java.io.File
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -51,14 +52,15 @@ fun CameraScreen(
 
     val cameraExecutor: ExecutorService = remember { Executors.newSingleThreadExecutor() }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
-    var galleryImageUri by remember { mutableStateOf<Uri?>(null) }
+    var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
+    var capturedFileUri by remember { mutableStateOf<Uri?>(null) }
 
     // Gallery picker launcher
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
-        galleryImageUri = uri
         if (uri != null) {
+            capturedFileUri = uri
             viewModel.onPhotoCaptured(uri.toString())
         }
     }
@@ -134,7 +136,7 @@ fun CameraScreen(
                     modifier = Modifier.fillMaxSize(),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Image preview placeholder
+                    // Show actual image preview using Coil
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -142,21 +144,13 @@ fun CameraScreen(
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
-                        Surface(
-                            modifier = Modifier.fillMaxSize(),
-                            color = MaterialTheme.colorScheme.surfaceVariant
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(
-                                        Icons.Default.Image,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(64.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text("照片预览")
-                                }
-                            }
+                        if (state.capturedImageUri != null) {
+                            AsyncImage(
+                                model = state.capturedImageUri,
+                                contentDescription = "拍摄的照片",
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Fit
+                            )
                         }
                     }
 
@@ -166,11 +160,43 @@ fun CameraScreen(
                         Text("AI 分析中...")
                     } else if (state.analysisResult != null) {
                         // Analysis done
+                        Text(
+                            text = "分析完成！",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Button(onClick = {
+                            val convId = state.conversationId
                             viewModel.resetState()
-                            onNavigateToChat(state.analysisResult ?: "")
+                            if (convId > 0) {
+                                onNavigateToChat("$convId")
+                            } else {
+                                onNavigateToChat("")
+                            }
                         }) {
                             Text("查看解答")
+                        }
+                    } else if (state.errorMessage != null) {
+                        // Error state
+                        Text(
+                            text = state.errorMessage ?: "分析失败",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly
+                        ) {
+                            OutlinedButton(onClick = { viewModel.retakePhoto() }) {
+                                Text("重拍")
+                            }
+                            Button(onClick = { viewModel.confirmPhoto() }) {
+                                Text("重试")
+                            }
                         }
                     } else {
                         // Action buttons
@@ -192,7 +218,7 @@ fun CameraScreen(
             } else {
                 // Camera preview
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // CameraX Preview
+                    // CameraX Preview + ImageCapture
                     AndroidView(
                         factory = { ctx ->
                             PreviewView(ctx).apply {
@@ -202,6 +228,13 @@ fun CameraScreen(
                                     val preview = Preview.Builder().build().also { p ->
                                         p.setSurfaceProvider(this@apply.surfaceProvider)
                                     }
+                                    // Configure ImageCapture
+                                    val imageCaptureBuilder = ImageCapture.Builder()
+                                        .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                                        .setTargetRotation(this@apply.display?.rotation ?: 0)
+                                        .build()
+                                    imageCapture = imageCaptureBuilder
+
                                     val cameraSelector = if (lensFacing == CameraSelector.LENS_FACING_FRONT)
                                         CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                                     try {
@@ -209,7 +242,8 @@ fun CameraScreen(
                                         cameraProvider.bindToLifecycle(
                                             lifecycleOwner,
                                             cameraSelector,
-                                            preview
+                                            preview,
+                                            imageCaptureBuilder
                                         )
                                     } catch (e: Exception) {
                                         e.printStackTrace()
@@ -244,7 +278,27 @@ fun CameraScreen(
                         // Capture button
                         FilledIconButton(
                             onClick = {
-                                viewModel.onPhotoCaptured("camera_capture")
+                                val capture = imageCapture ?: return@FilledIconButton
+                                val photoFile = File(
+                                    context.cacheDir,
+                                    "captured_${SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())}.jpg"
+                                )
+                                val outputOptions = ImageCapture.OutputFileOptions.Builder(photoFile).build()
+                                capture.takePicture(
+                                    outputOptions,
+                                    ContextCompat.getMainExecutor(context),
+                                    object : ImageCapture.OnImageSavedCallback {
+                                        override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                            val savedUri = Uri.fromFile(photoFile)
+                                            capturedFileUri = savedUri
+                                            viewModel.onPhotoCaptured(savedUri.toString())
+                                        }
+
+                                        override fun onError(exception: ImageCaptureException) {
+                                            exception.printStackTrace()
+                                        }
+                                    }
+                                )
                             },
                             modifier = Modifier
                                 .size(72.dp)
@@ -265,6 +319,8 @@ fun CameraScreen(
                                 CameraSelector.LENS_FACING_FRONT
                             else
                                 CameraSelector.LENS_FACING_BACK
+                            // Clear existing capture reference to be recreated in recomposition
+                            imageCapture = null
                         }) {
                             Icon(
                                 Icons.Default.FlipCameraAndroid,

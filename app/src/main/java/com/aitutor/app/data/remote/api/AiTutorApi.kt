@@ -2,6 +2,7 @@ package com.aitutor.app.data.remote.api
 
 import com.aitutor.app.data.remote.dto.*
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.ResponseBody
 import retrofit2.Response
 import retrofit2.http.*
@@ -44,6 +45,14 @@ interface AiTutorApi {
     @Multipart
     @POST("api/v1/solve/photo")
     suspend fun solvePhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<SolvePhotoResponse>>
+
+    // Streaming image upload (with conversation_id)
+    @Multipart
+    @POST("api/v1/chat/image")
+    suspend fun uploadImage(
+        @Part file: MultipartBody.Part,
+        @Part("conversation_id") conversationId: okhttp3.RequestBody
+    ): Response<ApiResponse<SolvePhotoResponse>>
 
     // Subscription
     @GET("api/v1/subscription/status")

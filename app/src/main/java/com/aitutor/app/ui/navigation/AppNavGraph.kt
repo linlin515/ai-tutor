@@ -147,9 +147,16 @@ fun AppNavGraph() {
 
             composable(Routes.SOLVE) {
                 CameraScreen(
-                    onNavigateToChat = { result ->
-                        navController.navigate(Routes.CHAT) {
-                            popUpTo(Routes.CHAT)
+                    onNavigateToChat = { convIdStr ->
+                        if (convIdStr.isNotBlank() && convIdStr.toLongOrNull() != null) {
+                            val convId = convIdStr.toLong()
+                            navController.navigate(Routes.chatConversation(convId)) {
+                                popUpTo(Routes.CHAT) { inclusive = false }
+                            }
+                        } else {
+                            navController.navigate(Routes.CHAT) {
+                                popUpTo(Routes.CHAT) { inclusive = false }
+                            }
                         }
                     }
                 )
