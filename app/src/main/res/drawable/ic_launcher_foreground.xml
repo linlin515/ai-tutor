@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- AI学伴 Launcher 图标前景 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 书本图标 -->
+    <group
+        android:translateX="18"
+        android:translateY="22">
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M36,8L36,56L18,48L0,56L0,8L18,0Z" />
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M72,8L72,56L54,48L36,56L36,8L54,0Z" />
+    </group>
+    <!-- 星星装饰 -->
+    <group
+        android:translateX="66"
+        android:translateY="14">
+        <path
+            android:fillColor="#FFD700"
+            android:pathData="M12,0L15.27,8.11L24,8.73L17.46,14.38L19.41,23L12,18.27L4.59,23L6.54,14.38L0,8.73L8.73,8.11Z" />
+    </group>
+</vector>
