@@ -190,16 +190,39 @@ class ChatRepositoryImpl @Inject constructor(
             val requestBody = imageBytes.toRequestBody("image/jpeg".toMediaTypeOrNull())
             val imagePart = MultipartBody.Part.createFormData("file", "photo_${System.currentTimeMillis()}.jpg", requestBody)
             val conversationIdPart = conversationId.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+            val oldPhotoPart = MultipartBody.Part.createFormData("photo", "photo_${System.currentTimeMillis()}.jpg", requestBody)
 
-            // Upload via API
-            val response = aiTutorApi.uploadImage(imagePart, conversationIdPart)
-            val body = response.body()
+            // Upload via API — try new streaming endpoint first, fallback to solvePhoto
+            var analysisResult: String? = null
 
-            if (response.isSuccessful && body?.code == 0 && body.data != null) {
-                Result.success(body.data.answer)
+            // Try new uploadImage endpoint
+            try {
+                val response = aiTutorApi.uploadImage(imagePart, conversationIdPart)
+                val body = response.body()
+                if (response.isSuccessful && body?.code == 0 && body.data != null) {
+                    analysisResult = body.data.answer
+                }
+            } catch (_: Exception) {
+                // Fall through to fallback
+            }
+
+            // Fallback: try existing solvePhoto endpoint
+            if (analysisResult == null) {
+                try {
+                    val fallbackResponse = aiTutorApi.solvePhoto(oldPhotoPart)
+                    val fallbackBody = fallbackResponse.body()
+                    if (fallbackResponse.isSuccessful && fallbackBody?.code == 0 && fallbackBody.data != null) {
+                        analysisResult = fallbackBody.data.answer
+                    }
+                } catch (_: Exception) {
+                    // Fall through
+                }
+            }
+
+            if (analysisResult != null) {
+                Result.success(analysisResult!!)
             } else {
-                val errorMsg = body?.message ?: "图片上传失败 (${response.code()})"
-                Result.failure(Exception(errorMsg))
+                Result.failure(Exception("图片上传失败，请检查网络连接"))
             }
         } catch (e: Exception) {
             Result.failure(Exception("图片处理失败: ${e.message}", e))
