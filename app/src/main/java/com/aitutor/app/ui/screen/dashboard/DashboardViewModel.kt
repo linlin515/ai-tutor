@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aitutor.app.domain.model.*
 import com.aitutor.app.domain.repository.AnalyticsRepository
+import com.aitutor.app.domain.repository.GamificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -17,12 +18,18 @@ data class DashboardUiState(
     val selectedSubject: String = "all",
     val isLoading: Boolean = true,
     val isRefreshing: Boolean = false,
-    val isEmpty: Boolean = false
+    val isEmpty: Boolean = false,
+    // F46 游戏化数据
+    val achievements: List<AchievementWithStatus> = emptyList(),
+    val streak: StreakResult = StreakResult(),
+    val rankings: List<RankEntry> = emptyList(),
+    val userScore: UserScore? = null
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
-    private val analyticsRepository: AnalyticsRepository
+    private val analyticsRepository: AnalyticsRepository,
+    private val gamificationRepository: GamificationRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -30,12 +37,40 @@ class DashboardViewModel @Inject constructor(
 
     init {
         loadDashboard()
+        observeGamificationData()
+    }
+
+    private fun observeGamificationData() {
+        // 观察成就数据
+        viewModelScope.launch {
+            gamificationRepository.observeAchievements().collect { achievements ->
+                _uiState.update { it.copy(achievements = achievements) }
+            }
+        }
+        // 观察连胜数据
+        viewModelScope.launch {
+            gamificationRepository.observeStreak().collect { streak ->
+                _uiState.update { it.copy(streak = streak) }
+            }
+        }
+        // 观察排行榜数据
+        viewModelScope.launch {
+            gamificationRepository.observeLeaderboard().collect { rankings ->
+                _uiState.update { it.copy(rankings = rankings) }
+            }
+        }
+        // 观察用户积分数据
+        viewModelScope.launch {
+            gamificationRepository.observeUserScore().collect { userScore ->
+                _uiState.update { it.copy(userScore = userScore) }
+            }
+        }
     }
 
     fun loadDashboard() {
         viewModelScope.launch {
             _uiState.update { it.copy(isLoading = true) }
-            
+
             analyticsRepository.getDashboardStats().collect { stats ->
                 _uiState.update {
                     it.copy(
@@ -47,9 +82,13 @@ class DashboardViewModel @Inject constructor(
                 }
             }
         }
-        
+
         viewModelScope.launch {
             analyticsRepository.refreshFromCloud()
+        }
+
+        viewModelScope.launch {
+            gamificationRepository.initializeAchievements()
         }
     }
 
@@ -57,6 +96,7 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.update { it.copy(isRefreshing = true) }
             analyticsRepository.refreshFromCloud()
+            gamificationRepository.refreshLeaderboard()
             loadDashboard()
             _uiState.update { it.copy(isRefreshing = false) }
         }

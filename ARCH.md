@@ -1177,3 +1177,1400 @@ ui/screen/review/components/ReviewCalendar.kt
 │  └─ F44+F45 需 F43 的仪表盘数据                                               │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
+---
+
+## 7. 语音云服务降级与打断协调模块 (F16 + F18 + F20)
+
+> PRD 基准：§2.2 F16/F18/F20, §4.6, §5.2
+> 优先级：P1（语音体验完善）
+
+### 7.1 技术选型
+
+| 层级 | 技术 | 用途 |
+|------|------|------|
+| 本地 ASR | Android SpeechRecognizer | 短音频实时识别（降级前优先） |
+| 云端 ASR | CloudAsrEngine (Retrofit + Audio Upload) | 长音频/低置信度降级识别 |
+| 本地 TTS | Android TextToSpeech | 短文本朗读 (<500字) |
+| 云端 TTS | CloudTtsEngine (SSE Audio Stream) | 长文本流式朗读 (≥500字) |
+| 音频播放 | ExoPlayer / AudioTrack | 云端 TTS PCM 音频块播放 |
+| 状态管理 | VoiceUiState (sealed class) | 语音状态机仲裁 |
+| 性能指标 | Acoust NoiseSuppression (可选) | 环境自适应降噪 |
+
+### 7.2 语音状态机架构
+
+```kotlin
+// 统一状态管理：语音交互的完整生命周期
+sealed class VoiceState {
+    object Idle : VoiceState()
+    data class Listening(
+        val amplitude: Float,        // 音量振幅 (UI 动画用)
+        val durationMs: Long,        // 已录音时长
+        val source: AudioSource      // LOCAL / CLOUD
+    ) : VoiceState()
+    data class Processing(
+        val partialText: String?,    // 部分识别结果
+        val source: AudioSource
+    ) : VoiceState()
+    data class Speaking(
+        val messageId: String,        // 正在播放的消息 ID
+        val progress: Float,          // 播放进度 0.0~1.0
+        val source: AudioSource       // LOCAL / CLOUD
+    ) : VoiceState()
+    data class Error(val code: VoiceErrorCode, val message: String) : VoiceState()
+}
+
+enum class VoiceErrorCode {
+    ASR_NO_SPEECH,      // 未检测到语音
+    ASR_RECOG_FAIL,     // 识别失败
+    TTS_ENGINE_MISSING, // TTS 引擎未安装
+    CLOUD_TIMEOUT,      // 云端超时
+    NETWORK_UNAVAILABLE // 无网络
+}
+```
+
+**状态机流转规则**：
+
+```
+                   ┌──────────┐
+                   │   IDLE   │◄─────────────────────────┐
+                   └────┬─────┘                          │
+                        │ 长按语音按钮                      │
+                        ▼                                │
+                   ┌──────────┐        松开 + 识别成功      │
+         ┌────────→│ LISTENING│────────────────────────┐  │
+         │         └────┬─────┘                        │  │
+         │              │ 松开 / 自动结束               │  │
+         │              ▼                              │  │
+         │         ┌──────────┐     conf<0.6 / >30s    │  │
+         │         │PROCESSING│──── ─ ─ ─ ─ ─ ─ ─ ─→  │  │
+         │         └────┬─────┘    CloudAsrEngine      │  │
+         │              │ 识别完成                      │  │
+         │              ▼                              │  │
+         │         ┌──────────┐                        │  │
+         │         │   DONE   │──→ 填充文本到输入框       │  │
+         │         └──────────┘                        │  │
+         │                                            │  │
+         │  TTS 播放触发:                               │  │
+         │    ┌──────────┐    打断: 点击其他消息         │  │
+         │    │ SPEAKING │──── ─ ─ ─ ─ ─ ─ ─ ─ ─ ─────┘  │
+         │    └────┬─────┘    或: 长按语音按钮触发        │  │
+         │         │ 播放完成                            │  │
+         └─────────┴─────────────────────────────────────┘
+
+触发打断时：
+  SPEAKING → 立即停止 TTS → 清空 AudioTrack Buffer → LISTENING
+  打断延迟目标: < 300ms
+```
+
+### 7.3 F16 云端 ASR 降级策略
+
+#### 降级判定链
+
+```
+用户语音输入完成
+    │
+    ├─ 音频时长 > 30s ?
+    │   ├─ 是 → 跳过本地ASR → 直接上传云端
+    │   └─ 否 → 走本地 SpeechRecognizer
+    │
+    ├─ 本地识别结果 conf < 0.6 ?
+    │   ├─ 是 → 触发云端 ASR 备选
+    │   └─ 否 → 使用本地结果
+    │
+    └─ 云端 ASR 返回后：
+        ├─ 本地结果未展示 → 替换为云端结果
+        └─ 本地结果已展示 → 在输入框追加/替换（用户可手动编辑）
+```
+
+#### 接口定义
+
+```
+POST /api/v1/voice/asr
+Content-Type: multipart/form-data
+Authorization: Bearer ***
+
+Fields:
+  audio: File (WAV/PCM/MP3, ≤10MB, 单声道 16kHz 采样率)
+  source: String ("voice_input" / "long_audio")
+  noise_level: String? ("quiet" / "moderate" / "noisy")
+
+Response:
+{
+  "text": "识别后的文本",
+  "confidence": 0.92,
+  "language": "zh-CN",
+  "segments": [
+    {"start_ms": 0, "end_ms": 1200, "text": "第一句"},
+    {"start_ms": 1200, "end_ms": 3000, "text": "第二句"}
+  ],
+  "duration_ms": 3500
+}
+
+错误响应:
+{
+  "error": "AUDIO_TOO_SHORT",
+  "message": "音频过短，请重新录制"
+}
+```
+
+#### 降级配置参数 (DataStore)
+
+```kotlin
+data class AsrFallbackConfig(
+    val durationThresholdMs: Long = 30_000L,   // 长音频阈值 30s
+    val confidenceThreshold: Float = 0.6f,      // 本地识别置信度阈值
+    val cloudTimeoutMs: Long = 15_000L,         // 云端超时 15s
+    val noiseThresholdDb: Float = 60f           // 噪声阈值 60dB
+)
+```
+
+#### 关键类
+
+```
+data/media/
+├── CloudAsrEngine.kt          // 云端 ASR 调用封装
+│   ├── fun recognize(audioFile: File, config: AsrFallbackConfig): Flow<AsrResult>
+│   ├── suspend fun cancel()
+│   └── fun isCloudAvailable(): Boolean
+│
+├── AsrFallbackStrategy.kt     // 降级判定逻辑 (纯 Kotlin, 无 Android 依赖)
+│   └── fun shouldFallback(localConfidence: Float, audioDurationMs: Long, noiseDb: Float): FallbackDecision
+│       // return SKIP / FALLBACK / USE_LOCAL
+│
+└── VoiceRepository.kt (修改)
+    └── fun recognize(...): Flow<VoiceResult>
+        // 内部协调本地 → 云端降级逻辑
+```
+
+### 7.4 F18 云端 TTS 流式播放
+
+#### 本地/云端切换策略
+
+```
+用户点击 TTS 按钮
+    │
+    ├─ 文本长度 < 500 字 AND 本地引擎可用 ?
+    │   ├─ 是 → Android TextToSpeech 本地播放
+    │   └─ 否 → 请求云端 TTS
+    │
+    └─ 云端 TTS:
+        ├─ POST /api/v1/voice/tts (SSE)
+        ├─ SSE 逐块接收 audio/base64 chunk
+        ├─ ExoPlayer 逐块追加播放
+        └─ 流结束 → 标记播放完成
+```
+
+#### 接口定义
+
+```
+POST /api/v1/voice/tts (SSE)
+Authorization: Bearer ***
+
+{
+  "text": "需要朗读的文本内容...",
+  "voice": "zh-CN-XiaoxiaoNeural",  // 音色
+  "speed": 1.0,                      // 语速 0.5~2.0
+  "pitch": 1.0,                      // 音调 0.5~1.5
+  "format": "pcm_16000hz_mono"       // 音频格式
+}
+
+SSE events:
+  event: audio_chunk
+    data: {"sequence": 0, "audio_base64": "...", "duration_ms": 800}
+  
+  event: audio_chunk
+    data: {"sequence": 1, "audio_base64": "...", "duration_ms": 900}
+  
+  event: complete
+    data: {"total_chunks": 12, "total_duration_ms": 10500}
+  
+  event: error
+    data: {"code": "TTS_ENGINE_ERROR", "message": "语音合成失败"}
+```
+
+#### 客户端播放架构
+
+```
+CloudTtsEngine
+├── fun streamTts(request: TtsRequest): Flow<TtsChunk>
+│   // SSE 流式接收 → emit TtsChunk(audioBytes, sequence, durationMs)
+│
+├── TtsAudioPlayer
+│   ├── AudioTrack (PCM 直接播放)
+│   │   ├── fun enqueueChunk(chunk: ByteArray)  // 追加到播放缓冲区
+│   │   ├── fun play()          // 开始播放
+│   │   ├── fun pause()         
+│   │   ├── fun stop()          // 立即停止 + 清空缓冲区
+│   │   └── fun flush()         // 清空未播放缓冲区
+│   │
+│   └── PlaybackState: IDLE / BUFFERING / PLAYING / PAUSED / STOPPED
+│
+├── 缓存策略:
+│   ├── LruCache<String, ByteArray>  // text_hash → 完整音频
+│   ├── maxEntries: 50
+│   └── 相同文本 5 分钟内直接命中缓存
+```
+
+### 7.5 F20 语音打断协调
+
+#### 打断流程（精确到毫秒）
+
+```
+TTS 播放中 (SPEAKING)
+    │
+    ├─ 事件: 用户点击其他消息 TTS 按钮
+    │   ├─ 1. TtsAudioPlayer.stop()        // 0ms: 立即停止播放
+    │   ├─ 2. AudioTrack.pause() + flush() // <10ms: 清空缓冲区
+    │   ├─ 3. 切换 VoiceState 为 PROCESSING // <20ms
+    │   ├─ 4. 新 TTS 请求发起               // <50ms
+    │   └─ 总打断延迟: <300ms ✅
+    │
+    ├─ 事件: 用户长按语音按钮触发 ASR
+    │   ├─ 1. TtsAudioPlayer.stop()         // 0ms
+    │   ├─ 2. AudioTrack.flush()            // <10ms
+    │   ├─ 3. VoiceState → LISTENING        // <20ms
+    │   └─ 4. SpeechRecognizer.start()      // <100ms
+    │
+    └─ 事件: 用户关闭 App / 切到后台
+        ├─ TtsAudioPlayer.pause()
+        └─ VoiceState → IDLE (onSaveInstanceState 持久化)
+```
+
+#### 防冲突机制
+
+| 并发场景 | 处理策略 |
+|---------|---------|
+| TTS 播放中触发同一消息 | 忽略重复请求，继续保持播放 |
+| TTS 播放中多次打断 | 以最后一次操作为准，旧的打断操作被取消 |
+| ASR 识别中触发 TTS | ASR 优先 → 等待 ASR 完成 → 若需要再 TTS |
+| 同时收到多个 TTS chunk | ExoPlayer 队列 FIFO 播放 |
+| 打断后瞬间再次打断 | 500ms 消抖窗口，窗口内合并为一次打断 |
+
+#### 关键类文件
+
+```
+data/media/
+├── CloudTtsEngine.kt           // (新建) 云端 TTS + 流式播放
+├── AsrFallbackStrategy.kt      // (新建) ASR 降级判定
+├── TtsAudioPlayer.kt           // (新建) AudioTrack 播放封装
+├── VoiceRepository.kt          // (修改) 打断协调 + 降级逻辑
+└── NoiseSuppression.kt         // (可选, F47) 降噪处理
+
+ui/screen/chat/components/
+└── VoiceInputBar.kt            // (修改) 打断交互流畅化
+
+domain/model/
+└── VoiceState.kt               // (新建) 统一语音状态机
+```
+
+### 7.6 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 云端 ASR 超时 (网络差) | 识别延迟 >15s | 设置 15s 超时 + 超时后提示"网络不稳定，请稍后重试" |
+| 云端 TTS 流式中断 | 播放卡顿/中断 | SSE 自动重连 + 已缓冲音频继续播放至耗尽 |
+| 打断时产生爆音 | 用户体验差 | AudioTrack 停止前快速 fade-out (10ms), 新播放 fade-in |
+| 本地 TTS 引擎未安装 | TTS 功能不可用 | 检测引擎 → 引导安装 → 降级为云端 TTS |
+| 多段音频拼接处有杂音 | 听感不连贯 | AudioTrack 缓冲区无缝拼接 + 交叉淡化 (crossfade) 算法 |
+
+---
+
+## 8. ML Kit OCR 集成方案 (F23)
+
+> PRD 基准：§2.2 F23, §4.7, §7.4
+> 优先级：P1（已归入 T8 基础模块，此处为独立架构描述）
+> 说明：F23 是 F40 拍照解题的底层基础设施，同时也为未来其他 OCR 场景（取景框文字检测、实时翻译等）提供基础能力。
+
+### 8.1 技术选型
+
+| 组件 | 版本 | 用途 |
+|------|------|------|
+| ML Kit Text Recognition v2 | com.google.mlkit:text-recognition:16.0.1 | 本地设备端文字识别 |
+| ML Kit Text Recognition Chinese | com.google.mlkit:text-recognition-chinese:16.0.1 | 中文字符识别增强包 |
+| CameraX Analyzer | androidx.camera:camera-core | 实时取景框帧分析 |
+| GraphicOverlay | 自定义 Canvas | OCR 检测框叠加层 |
+
+### 8.2 分层架构
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  UI Layer (Compose)                                           │
+│                                                               │
+│  CameraScreen                                                 │
+│  ├── PreviewView (CameraX)                                    │
+│  ├── GraphicOverlay (Canvas 叠加层)                            │
+│  │   └── TextGraphic: 文字边框 + 识别文本显示                  │
+│  └── SubjectSelector (学科选择器) ← 依赖 OCR 预识别            │
+│                                                               │
+│  CameraViewModel                                              │
+│  └── ocrText: StateFlow<OcrResult?>                           │
+│                                                               │
+├──────────────────────────────────────────────────────────────┤
+│  Data Layer                                                    │
+│                                                               │
+│  OcrEngine (data/vision/)                                      │
+│  ├── ML Kit 初始化 + 配置                                      │
+│  ├── fun analyze(imageProxy: ImageProxy): OcrResult            │
+│  └── fun analyzeBitmap(bitmap: Bitmap): OcrResult              │
+│                                                               │
+│  OcrResult model:                                              │
+│  ├── rawText: String          // 原始识别文本全文              │
+│  ├── blocks: List<TextBlock>  // 文本块列表                    │
+│  │   ├── text: String                                         │
+│  │   ├── boundingBox: Rect                                    │
+│  │   ├── confidence: Float                                    │
+│  │   └── lines: List<TextLine>                                │
+│  ├── detectedLanguage: String // 检测语言/学科                  │
+│  └── confidence: Float        // 整体置信度                    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### 8.3 实时帧分析策略
+
+```
+CameraX ImageAnalysis
+    │
+    ├─ 分析频率: 每 500ms 分析一帧 (跳过中间帧)
+    │   └─ 原因: ML Kit OCR 非实时消耗大, 500ms 间隔对取景框足够
+    │
+    ├─ 帧尺寸裁剪: 分析前缩放到 480p (宽边 ≤ 640px)
+    │   └─ 平衡识别精度与性能
+    │
+    ├─ 分析结果:
+    │   ├─ 检测到文字 → 更新 GraphicOverlay 边框
+    │   │   └─ 边框颜色: 绿 (高置信度) / 黄 (中置信度)
+    │   ├─ 未检测到文字 → 清空 GraphicOverlay
+    │   └─ ML Kit 识别失败 → 保留上次结果 (不闪烁)
+    │
+    └─ 性能指标:
+        ├─ 单帧分析延迟: < 200ms
+        ├─ 内存增长: < 50MB (OCR 模型常驻)
+        └─ 电池影响: CameraX 生命周期感知, 仅在预览时工作
+```
+
+### 8.4 离线/在线混合策略
+
+```
+OcrEngine.analyze()
+    │
+    ├─ 始终优先使用 ML Kit 本地识别 (零延迟, 离线可用)
+    │
+    ├─ 本地识别结果可选补充:
+    │   ├─ 用户手动点击"增强识别"
+    │   │   └─ 上传图片至 POST /api/v1/solve/photo (server-side OCR)
+    │   └─ 本地置信度 < 0.5 时自动提示"使用云端识别提升精度"
+    │
+    └─ 学科预检测:
+        ├─ ML Kit 检测文字 → 关键词匹配 → 推测学科
+        └─ 自动设置 SubjectSelector 默认值
+```
+
+### 8.5 关键类
+
+```
+data/vision/
+├── OcrEngine.kt                   // OCR 引擎封装
+│   ├── class OcrEngine @Inject constructor()
+│   ├── suspend fun analyzeImageProxy(imageProxy: ImageProxy): OcrResult
+│   ├── suspend fun analyzeBitmap(bitmap: Bitmap): OcrResult
+│   └── fun release()              // 释放 ML Kit 资源
+│
+├── OcrGraphicOverlay.kt           // 取景框叠加层
+│   └── class OcrGraphicOverlay(context) : View
+│       └── fun update(results: OcrResult)  // 更新文字边框
+│
+└── SubjectDetector.kt             // 学科预检测器
+    └── fun detectSubject(ocrText: String): Subject
+        // 基于关键词匹配: "方程"→数学, "F=ma"→物理
+```
+
+### 8.6 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| ML Kit 中文识别准确率不足 | 中文字符识别错误 | 加载中文识别增强包；降低期望，定位为辅；拍照上传后服务端 OCR 为主 |
+| 手写体识别率低 | 手写题目无法识别 | ML Kit 不支持手写 → 提示用户使用印刷体或上传以触发服务端 OCR |
+| 持续 OCR 导致发热/耗电 | 电池消耗快 | 500ms 帧间隔 + 拍照后停止分析；CameraX 生命周期绑定 |
+| OCR 模型 APK 体积大 (~8MB) | APK 增长超限 | 使用 ML Kit 按需下载 (Downloadable) 而非捆绑；首次使用提示下载 |
+
+---
+
+## 9. 图片消息渲染组件 (F24)
+
+> PRD 基准：§2.2 F24, §4.4
+> 优先级：P1（聊天体验完善）
+> 依赖：T4 (聊天界面) ✅, T8 (拍照基础) ✅
+
+### 9.1 组件架构
+
+```
+MessageBubble (修改)
+│
+├── isImageMessage(message) ?  // 消息类型判断
+│   ├─ 是 → ImageMessage 组件       ← 新分支
+│   └─ 否 → 原有文本渲染
+│
+└── ImageMessage 组件 (新建)
+    ├── 缩略图模式 (聊天列表内)
+    │   ├── 最大尺寸: 240dp x 240dp (宽高比保持)
+    │   ├── Coil ImageLoader 异步加载 (内存缓存 + 磁盘缓存)
+    │   ├── 加载中: placeholder shimmer 动画
+    │   ├── 加载成功: Crossfade 淡入
+    │   └── 加载失败: 错误占位图 + "重新加载"按钮
+    │
+    └── 全屏预览模式 (点击后)
+        ├── PhotoView (Gesture 库) 
+        │   ├── 手势双指缩放 (1x ~ 5x)
+        │   ├── 单指拖动平移
+        │   └── 双击缩放/还原
+        ├── 顶部工具栏: 返回 + 发送时间
+        └── 底部: "保存到相册"按钮
+```
+
+### 9.2 数据流
+
+```
+消息接收/发送
+    │
+    ├─ 用户发送图片 → 压缩后上传 → 成功后消息写入 Room
+    │   └─ message.imageUrl = backend_url
+    │
+    ├─ AI 回复含图片 → SSE 返回 image_url 字段
+    │   └─ message.imageUrl = ai_generated_url
+    │
+    ├─ ImageMessage 渲染:
+    │   ├─ Coil: ImageRequest(url)
+    │   │   ├─ memoryCachePolicy = ENABLED
+    │   │   ├─ diskCachePolicy = ENABLED
+    │   │   ├─ size = 240dp (缩略图) / original (全屏)
+    │   │   └─ crossfade(300ms)
+    │   └─ 加载成功 → 显示图片
+    │
+    └─ 异常处理:
+        ├─ 网络错误 → 显示错误状态 + 重试按钮
+        ├─ URL 过期 → 显示"图片已过期"
+        └─ 格式不支持 → 显示"暂不支持此图片格式"
+```
+
+### 9.3 缓存策略
+
+```kotlin
+// Coil ImageLoader 配置
+imageLoader = ImageLoader.Builder(context)
+    .memoryCache {
+        MemoryCache.Builder()
+            .maxSizePercent(0.25)      // 占用 25% 应用堆内存
+            .build()
+    }
+    .diskCache {
+        DiskCache.Builder()
+            .directory(cacheDir.resolve("image_cache"))
+            .maxSizeBytes(50 * 1024 * 1024)  // 50MB 磁盘缓存
+            .build()
+    }
+    .build()
+
+// 缓存清理入口 (与 F31 CacheManager 联动)
+class ImageCacheCleaner @Inject constructor(
+    private val imageLoader: ImageLoader
+) {
+    suspend fun clearMemoryCache() = withContext(Dispatchers.Main) {
+        imageLoader.memoryCache?.clear()
+    }
+    suspend fun clearDiskCache() {
+        imageLoader.diskCache?.clear()
+    }
+}
+```
+
+### 9.4 关键类
+
+```
+ui/screen/chat/components/
+├── ImageMessage.kt          // (新建) 图片消息组件
+│   └── @Composable fun ImageMessage(
+│           url: String,
+│           isMine: Boolean,
+│           onRetry: () -> Unit,
+│           onClick: () -> Unit  // 触发全屏预览
+│       )
+│
+├── PhotoPreviewDialog.kt    // (新建) 全屏预览弹窗
+│   └── @Composable fun PhotoPreviewDialog(
+│           url: String,
+│           onDismiss: () -> Unit
+│       )
+│
+└── MessageBubble.kt         // (修改) 添加图片类型分支
+```
+
+### 9.5 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 大图 OOM | App 崩溃 | Coil 缩略图 size 限制 + Glide 自动 downsampling |
+| 图片 URL 失效 | 图片不显示 | 展示"图片已过期"占位图；本地缓存图片文件作为 fallback |
+| 全屏预览时手势冲突 | 缩放/滑动异常 | PhotoView 库处理手势冲突 + Compose 嵌套滚动协调 |
+| 图片缓存占用过多磁盘 | 存储空间不足 | 50MB 上限 + LRU 淘汰 + 与 F31 联动清理 |
+
+---
+
+## 10. 订阅管理数据绑定模块 (F30)
+
+> PRD 基准：§2.2 F30, §4.13
+> 优先级：P2（体验完善）
+> 依赖：T20 (个人中心) ✅, 后端 Subscription API ✅
+
+### 10.1 数据流
+
+```
+SubscriptionScreen
+    │
+    ├─ 页面加载:
+    │   ├─ SubscriptionVM.init()
+    │   │   ├─ 读本地缓存 (SubscriptionEntity, DataStore)
+    │   │   └─ 并行请求 GET /api/v1/subscription/status
+    │   │       ├─ 成功 → 更新本地缓存 + StateFlow
+    │   │       └─ 失败 → 使用缓存数据 + 显示静默刷新状态
+    │   │
+    │   └─ 渲染订阅状态:
+    │       ├─ 套餐卡片 (免费/订阅)
+    │       ├─ 配额进度条 (daily_used / daily_quota)
+    │       ├─ 功能对比表 (动态: 基于后端返回的功能列表)
+    │       └─ 订阅按钮/管理按钮
+    │
+    ├─ 用户操作:
+    │   ├─ 点击"订阅" → 跳转外部支付链接
+    │   ├─ 点击"管理订阅" → 跳转外部管理页面
+    │   └─ 配额用尽 → 弹窗引导订阅
+    │
+    └─ 配额状态全局共享:
+        └─ SubscriptionRepository.subscriptionState: StateFlow<SubscriptionState>
+            ├─ ChatViewModel 读取 → 超配额时禁用发送
+            ├─ CameraViewModel 读取 → 超配额时禁用拍照解题
+            └─ VoiceRepository 读取 → 超配额时禁用云端语音
+```
+
+### 10.2 接口定义
+
+```
+GET /api/v1/subscription/status
+Authorization: Bearer ***
+
+Response:
+{
+  "plan_type": "free",          // free / premium / trial
+  "status": "active",           // active / expired / cancelled / grace_period
+  "features": {
+    "chat": {"enabled": true, "limit": 100, "used": 23},
+    "solve_photo": {"enabled": true, "limit": 5, "used": 3},
+    "voice_asr_cloud": {"enabled": false, "limit": 0, "used": 0},
+    "voice_tts_cloud": {"enabled": false, "limit": 0, "used": 0},
+    "dashboard": {"enabled": true, "limit": null, "used": null},
+    "quiz": {"enabled": true, "limit": null, "used": null},
+    "review": {"enabled": true, "limit": null, "used": null},
+    "gamification": {"enabled": true, "limit": null, "used": null}
+  },
+  "daily_quota": {
+    "total_queries": 100,
+    "used_queries": 23,
+    "reset_at": "2026-05-16T00:00:00+08:00"
+  },
+  "valid_until": null,          // premium 套餐有截止日期
+  "trial_available": true       // 是否可试用
+}
+```
+
+### 10.3 配额拦截架构
+
+```
+┌────────────────────────────────────────────────────────────────┐
+│                  全局配额守卫 (QuotaGuard)                       │
+│                                                                │
+│  SubscriptionRepository                                        │
+│  ├── subscriptionState: StateFlow<SubscriptionState>           │
+│  ├── fun checkQuota(feature: FeatureType): QuotaResult         │
+│  │   ├── QuotaResult.Allowed                                   │
+│  │   ├── QuotaResult.Exceeded(resetAt)                         │
+│  │   └── QuotaResult.Disabled(feature)                         │
+│  └── fun consumeQuota(feature: FeatureType)                    │
+│       // 调用后端 POST /api/v1/subscription/consume            │
+│                                                                │
+│  消费拦截点:                                                    │
+│  ├── ChatViewModel.sendMessage() → checkQuota("chat")          │
+│  ├── SolveRepository.solvePhoto() → checkQuota("solve_photo")  │
+│  ├── CloudAsrEngine → checkQuota("voice_asr_cloud")            │
+│  └── CloudTtsEngine → checkQuota("voice_tts_cloud")            │
+└────────────────────────────────────────────────────────────────┘
+```
+
+### 10.4 本地缓存模型
+
+```kotlin
+// Room Entity — 本地缓存订阅快照
+@Entity(tableName = "subscription_cache")
+data class SubscriptionCacheEntity(
+    @PrimaryKey val id: String = "subscription",
+    val planType: String,            // free / premium / trial
+    val status: String,              // active / expired / ...
+    val featuresJson: String,        // JSON: features map
+    val dailyQuotaTotal: Int,        
+    val dailyQuotaUsed: Int,
+    val validUntil: Long?,           
+    val updatedAt: Long
+)
+
+// DataStore 偏好 — 配额计数器 (离线可用)
+// 键: "quota_chat_used", "quota_solve_used", ...
+// 值: 当日已使用次数
+// 每日 00:00 自动重置 (App 启动时检查日期)
+```
+
+### 10.5 关键类
+
+```
+ui/screen/subscription/
+├── SubscriptionScreen.kt        (修改: 绑定真实数据)
+├── SubscriptionViewModel.kt     (修改: API 对接)
+└── components/
+    ├── PlanCard.kt              (套餐卡片)
+    ├── QuotaProgressBar.kt      (配额进度条)
+    ├── FeatureComparisonTable.kt (功能对比表)
+    └── QuotaExceededDialog.kt   (配额用尽弹窗)
+
+data/
+├── remote/
+│   └── api/SubscriptionApi.kt   (新建: GET status + POST consume)
+├── local/
+│   ├── dao/SubscriptionCacheDao.kt  (新建)
+│   └── entity/SubscriptionCacheEntity.kt (新建)
+├── repository/
+│   └── SubscriptionRepository.kt (新建: 接口+实现)
+└── model/
+    └── QuotaGuard.kt             (新建: 全局配额守卫)
+
+domain/
+└── model/
+    ├── SubscriptionState.kt     (新建: 订阅领域模型)
+    └── FeatureType.kt           (新建: 功能类型枚举)
+```
+
+### 10.6 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 后端订阅 API 不可用 | 页面显示空数据 | 本地缓存兜底 + 显示"数据加载中"状态 |
+| 配额计数漂移 (本地≠后端) | 功能提前/延迟锁定 | 每次 API 请求同步最新配额；本地为"近似值" |
+| 用户多设备同步延迟 | 配额不同步 | 配额在服务端严格计数；客户端仅展示参考值 |
+| 免费版用户看到付费功能入口 | 困惑 | 后端 features 控制开关；客户端按 enabled 字段渲染 |
+
+---
+
+## 11. 缓存清理与本地通知模块 (F31 + F32)
+
+> PRD 基准：§2.2 F31, F32
+> 优先级：P2（体验完善）
+> 依赖：T7 (Room) ✅, T17 (设置) ✅
+
+### 11.1 F31 缓存清理逻辑
+
+#### 缓存分类与清理策略
+
+| 缓存类型 | 存储位置 | 清理动作 | 清理后影响 |
+|---------|---------|---------|-----------|
+| 图片缓存 (Coil) | DiskCache ~/image_cache/ | clear() | 下次加载重新下载 |
+| 图片内存缓存 | Coil MemoryCache | clear() | 下次加载重新解码 |
+| OCR 模型文件 | ML Kit Downloadable | release() | 下次 OCR 触发重新下载 |
+| Room 数据库 WAL | database/*-wal, *-shm | checkpoint+wal关闭 | 无数据丢失 |
+| 日志文件 | logs/*.txt | deleteRecursively() | 调试日志丢失 |
+| Temp 文件 | cacheDir/temp/* | deleteRecursively() | 无影响 |
+| 用户偏好 (DataStore) | DataStore 文件 | ❌ 不清理 | 不清除用户设置 |
+| 消息历史 (Room) | database/*.db | ❌ 不清理 | 需用户主动"清空对话" |
+
+```kotlin
+class CacheManager @Inject constructor(
+    private val context: Context,
+    private val imageLoader: ImageLoader,
+    private val ocrEngine: OcrEngine,
+    private val database: AppDatabase       // Room
+) {
+    data class CacheSize(
+        val imageDisk: Long,                // 字节
+        val imageMemory: Long,
+        val logs: Long,
+        val temp: Long,
+        val total: Long
+    )
+    
+    suspend fun calculateSize(): CacheSize {
+        // 遍历各目录计算 → CacheSize
+    }
+    
+    suspend fun clearAll(onProgress: (Float) -> Unit = {}) {
+        onProgress(0.1f)
+        withContext(Dispatchers.IO) {
+            // 1. 清图片磁盘缓存
+            imageLoader.diskCache?.clear()
+            onProgress(0.3f)
+            
+            // 2. 清图片内存缓存 (必须在 MainThread)
+            withContext(Dispatchers.Main) {
+                imageLoader.memoryCache?.clear()
+            }
+            onProgress(0.5f)
+            
+            // 3. 释放 OCR 模型 (下次用时自动下载)
+            ocrEngine.release()
+            onProgress(0.7f)
+            
+            // 4. 清理日志
+            context.cacheDir.resolve("logs").deleteRecursively()
+            onProgress(0.85f)
+            
+            // 5. 清理临时文件
+            context.cacheDir.resolve("temp").deleteRecursively()
+            onProgress(0.95f)
+            
+            // 6. Room WAL checkpoint
+            database.query("PRAGMA wal_checkpoint(FULL)", null)
+            onProgress(1.0f)
+        }
+    }
+}
+```
+
+#### UI 交互
+
+```
+SettingsScreen
+└── "清除缓存" 行
+    ├── 显示: "缓存占用: X.X MB" (首次进入设置时计算)
+    ├── 点击: 弹出确认弹窗
+    │   ├── "清除缓存后将重新下载图片和OCR模型"
+    │   └── [取消] [确认清除]
+    ├── 确认: 
+    │   ├─ 显示进度: "正在清除... 50%"
+    │   ├─ 完成后显示 Toast "已清除 X.X MB 缓存"
+    │   └─ 更新缓存占用显示为 "0 B"
+    └── 只在首次显示或手动刷新时计算 (避免每次打开设置都计算)
+```
+
+### 11.2 F32 本地通知方案
+
+#### 通知渠道定义
+
+```kotlin
+object NotificationChannels {
+    const val CHANNEL_MESSAGE = "new_message"       // 新消息通知
+    const val CHANNEL_REVIEW = "review_reminder"    // 复习提醒
+    const val CHANNEL_SYSTEM = "system"             // 系统/配额通知
+
+    fun create(context: Context) {
+        val channels = listOf(
+            NotificationChannel(
+                CHANNEL_MESSAGE,
+                "新消息", 
+                NotificationManager.IMPORTANCE_HIGH   // 弹出 + 声音
+            ).apply {
+                description = "AI 回复新消息到达提醒"
+                enableVibration(true)
+            },
+            NotificationChannel(
+                CHANNEL_REVIEW,
+                "复习提醒",
+                NotificationManager.IMPORTANCE_DEFAULT  // 无声音
+            ).apply {
+                description = "间隔重复复习时间到达提醒"
+            },
+            NotificationChannel(
+                CHANNEL_SYSTEM,
+                "系统通知",
+                NotificationManager.IMPORTANCE_LOW      // 静默
+            ).apply {
+                description = "配额用尽、系统维护等"
+            }
+        )
+        val manager = context.getSystemService(NotificationManager::class.java)
+        manager.createNotificationChannels(channels)
+    }
+}
+```
+
+#### 新消息通知流程
+
+```
+SSE 流式输出完成 (完整消息写入 Room)
+    │
+    ├─ 前提条件:
+    │   ├─ App 在后台 (非前台可见)
+    │   └─ 应用进程存活 (非 killed)
+    │
+    ├─ NotificationHelper.sendMessageNotification()
+    │   ├─ 通知文案:
+    │   │   ├─ 标题: "AI 学伴"
+    │   │   ├─ 内容: 消息前 60 字 + "..."
+    │   │   ├─ 图标: app icon
+    │   │   └─ 频道: CHANNEL_MESSAGE
+    │   ├─ Intent PendingIntent:
+    │   │   ├─ 点击 → 打开 MainActivity
+    │   │   ├─ data: ?conversation_id={id}
+    │   │   └─ flags: FLAG_ACTIVITY_CLEAR_TOP | FLAG_ACTIVITY_SINGLE_TOP
+    │   └─ 通知 ID: conversation_id.hashCode() (避免重复创建)
+    │
+    └─ 通知点击后:
+        ├─ 打开 App → 跳转到对应会话
+        └─ 清除该会话的通知 (NotificationManager.cancel(id))
+```
+
+#### 复习提醒通知流程
+
+```
+SpacedRepetitionEngine 每天启动时扫描
+    │
+    ├─ 查询: SELECT * FROM wrong_answers WHERE next_review_at <= now()
+    │
+    ├─ 有待复习题目?
+    │   ├─ 是 → NotificationHelper.sendReviewReminder()
+    │   │   ├─ 标题: "复习提醒"
+    │   │   ├─ 内容: "你有 {N} 道题待复习"
+    │   │   ├─ 频道: CHANNEL_REVIEW
+    │   │   └─ 点击 → 打开 ReviewScreen
+    │   └─ 否 → 跳过
+    │
+    └─ 每天仅发送一次 (避免重复打扰)
+```
+
+#### 关键类
+
+```
+data/local/
+├── CacheManager.kt              (新建: 缓存清理管理器)
+├── NotificationHelper.kt        (新建/增强: 通知辅助类)
+└── NotificationChannels.kt      (新建: 通知渠道定义)
+
+ui/screen/settings/
+└── SettingsScreen.kt            (修改: 添加清除缓存 + 通知设置入口)
+
+AndroidManifest.xml              (修改: POST_NOTIFICATIONS 权限声明)
+```
+
+### 11.3 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| Android 13+ POST_NOTIFICATIONS 运行时权限 | 通知无法弹出 | 适配动态权限请求；拒绝后降级为无通知体验 |
+| 用户清理缓存时 App 正在加载图片 | 图片加载失败 | 缓存清理时机: 无活跃下载时；清理后 ImageLoading 自动回源 |
+| 通知重复 (同会话多条消息) | 通知栏被刷屏 | 按 conversation_id 聚合通知 (update 替换)；仅保留最新一条 |
+| App 被系统杀掉后无法收到通知 | 复习/消息提醒失效 | WorkManager 定时检查 + 启动时恢复错过的提醒 |
+
+---
+
+## 12. 游戏化系统 (F46)
+
+> PRD 基准：§2.2 F46, §9.1 F46
+> 优先级：P2（体验增强）
+> 依赖：T14 (仪表盘数据) ✅, Room (学习统计)
+
+### 12.1 系统架构
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  事件收集层                                                          │
+│                                                                     │
+│  每次学习行为 → EventBus / AnalyticsEngine → GamificationEngine     │
+│  ├─ MessageSent         (发送消息/提问)                              │
+│  ├─ SolveCompleted      (完成解题)                                   │
+│  ├─ QuizCompleted       (完成测验)                                   │
+│  ├─ ReviewCompleted     (完成复习)                                   │
+│  ├─ AppOpened           (每日打开 App)                               │
+│  └─ StreakMaintained    (连胜维持, 每日自动)                          │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│  引擎层 (domain/engine/)                                             │
+│                                                                     │
+│  GamificationEngine                                                  │
+│  ├── fun onEvent(event: LearningEvent)                              │
+│  │   ├── 更新积分: calculateScore(event)                             │
+│  │   ├── 检测成就: checkAchievements(userStats)                      │
+│  │   └── 更新连胜: updateStreak()                                    │
+│  │                                                                   │
+│  ├── fun getLeaderboard(type: LeaderboardType): Flow<List<RankEntry>>│
+│  │   └── 本地排名 + 云端同步 (按学习积分)                            │
+│  │                                                                   │
+│  └── ScoreCalculator (纯函数)                                        │
+│      ├── 解题: +10 分                                                │
+│      ├── 对话: +2 分/条                                              │
+│      ├── 测验: +20 分                                                │
+│      ├── 复习: +15 分                                                │
+│      └── 连胜加成: +5 分 × streak_days                              │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│  持久化层 (data/local/)                                              │
+│                                                                     │
+│  Room 实体:                                                          │
+│  ├── AchievementEntity     (成就列表, 已解锁/未解锁)                  │
+│  ├── UserScoreEntity       (用户积分 + 连胜数据)                      │
+│  └── ScoreLogEntity        (积分变更日志, 用于回滚/审计)               │
+│                                                                     │
+├─────────────────────────────────────────────────────────────────────┤
+│  UI 层 (ui/screen/dashboard/components/)                             │
+│                                                                     │
+│  ├── AchievementBadge.kt    (成就徽章网格)                            │
+│  ├── StreakIndicator.kt     (连胜火焰指示器)                          │
+│  └── LeaderboardView.kt     (排行榜页面)                              │
+│                                                                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### 12.2 成就系统设计
+
+#### 预置成就列表 (MVP)
+
+```kotlin
+enum class Achievement(
+    val id: String,
+    val title: String,
+    val description: String,
+    val icon: String,          // Emoji 或 Drawable 资源名
+    val condition: AchievementCondition
+) {
+    FIRST_SOLVE(
+        id = "first_solve",
+        title = "初次解题",
+        description = "完成第一次拍照解题",
+        icon = "📷",
+        condition = AchievementCondition.SolveCount(1)
+    ),
+    SOLVE_MASTER(
+        id = "solve_master",
+        title = "解题达人",
+        description = "累计完成 100 次拍照解题",
+        icon = "🏆",
+        condition = AchievementCondition.SolveCount(100)
+    ),
+    STREAK_7(
+        id = "streak_7",
+        title = "持之以恒",
+        description = "连续学习 7 天",
+        icon = "🔥",
+        condition = AchievementCondition.StreakDays(7)
+    ),
+    STREAK_30(
+        id = "streak_30",
+        title = "学霸养成",
+        description = "连续学习 30 天",
+        icon = "💎",
+        condition = AchievementCondition.StreakDays(30)
+    ),
+    QUIZ_100(
+        id = "quiz_100",
+        title = "答题王者",
+        description = "累计答对 100 道测验题",
+        icon = "🎯",
+        condition = AchievementCondition.QuizCorrectCount(100)
+    ),
+    QUIZ_PERFECT(
+        id = "quiz_perfect",
+        title = "满分选手",
+        description = "完成一次全对测验",
+        icon = "💯",
+        condition = AchievementCondition.QuizPerfect()
+    ),
+    REVIEW_MASTER(
+        id = "review_master",
+        title = "温故知新",
+        description = "完成 50 次复习",
+        icon = "📖",
+        condition = AchievementCondition.ReviewCount(50)
+    ),
+    SCHOLAR(
+        id = "scholar",
+        title = "学霸称号",
+        description = "累计积分达到 5000 分",
+        icon = "👑",
+        condition = AchievementCondition.TotalScore(5000)
+    );
+    
+    // 解锁后弹窗: achievement_dialog 显示标题+描述+icon+动画
+}
+```
+
+#### 成就检测机制
+
+```
+GamificationEngine.onEvent(event)
+    │
+    ├─ 加载所有成就列表 (AchievementDao.getAll())
+    │
+    ├─ 过滤未解锁成就 (status = LOCKED)
+    │
+    ├─ 对每个未解锁成就:
+    │   ├─ 读取当前用户统计数据 (UserStats)
+    │   └─ condition.isMet(userStats) ?
+    │       ├─ 是 → 解锁成就
+    │       │   ├─ AchievementDao.updateStatus(id, UNLOCKED)
+    │       │   ├─ 触发成就解锁弹窗 (SharedFlow → UI)
+    │       │   └─ 记录解锁时间
+    │       └─ 否 → 跳过
+    │
+    └─ 成就弹窗展示逻辑:
+        ├─ 同时解锁多个 → 队列展示 (间隔 1.5s)
+        ├─ 弹窗动画: 缩放 + 光效 (Compose Animation)
+        ├─ 点击弹窗 → 跳转到成就页
+        └─ 3s 自动消失
+```
+
+### 12.3 连胜机制
+
+```kotlin
+// 连胜计算逻辑 (纯 Kotlin, domain/engine 层)
+class StreakCalculator {
+    fun calculateStreak(learningDates: List<LocalDate>): StreakResult {
+        // 1. 按日期降序排列 (最近在前的去重)
+        // 2. 从今天往前数连续天数
+        // 3. 中断条件: 某一天无学习记录
+        // 4. 今日未学习 → streak 不变 (不算中断, 不加天数)
+        
+        val sorted = learningDates.distinct().sortedDescending()
+        var streak = 0
+        val today = LocalDate.now()
+        
+        if (sorted.isNotEmpty()) {
+            // 从今天开始检查连续性
+            var current = today
+            for (date in sorted) {
+                if (date == current) {
+                    streak++
+                    current = current.minusDays(1)
+                } else if (date < current) {
+                    break // 中断
+                }
+            }
+        }
+        
+        return StreakResult(
+            currentStreak = streak,
+            longestStreak = loadLongestStreak(sorted),
+            hasLearnedToday = today in sorted
+        )
+    }
+}
+
+data class StreakResult(
+    val currentStreak: Int,
+    val longestStreak: Int,
+    val hasLearnedToday: Boolean
+)
+```
+
+#### 连胜 UI
+
+```
+StreakIndicator.kt
+├── 显示位置:
+│   ├─ DashboardScreen 概览卡片
+│   └─ 主要: 连胜天数 + 火焰图标
+│
+├── 状态渲染:
+│   ├─ streak ≥ 30: 🔥🔥🔥 + "N 天" (金色)
+│   ├─ streak ≥ 7:  🔥🔥 + "N 天" (红色)
+│   ├─ streak ≥ 3:  🔥 + "N 天" (橙色)
+│   ├─ streak = 0:  "今天开始学习吧！"
+│   └─ 连胜归零时: 显示倒计时 "已中断"
+│
+└── 每日首次打开 App:
+    ├─ 连胜检测
+    ├─ streak++ 时显示 "🎉 已连续学习 N 天"
+    └─ 连胜中断时显示 "连胜中断，重新开始！"
+```
+
+### 12.4 排行榜设计
+
+```
+LeaderboardView.kt
+│
+├─ 排行榜类型:
+│   ├─ 全局排行榜 (所有用户在云端排名, 每日更新)
+│   └─ 好友排行榜 (预留, 需要好友系统)
+│
+├─ 数据来源:
+│   ├─ 本地: LeaderboardEntity (Room 缓存)
+│   └─ 云端: GET /api/v1/game/leaderboard
+│
+├─ 排名条目:
+│   ├─ rank: Int          // 排名
+│   ├─ nickname: String   // 昵称
+│   ├─ score: Int         // 总积分
+│   ├─ level: String?     // 等级 (预留)
+│   └─ isMe: Boolean      // 是否当前用户
+│
+├─ 交互:
+│   ├─ 自己排名始终在列表顶部高亮
+│   ├─ 下拉刷新
+│   └─ 点击用户 → 查看其公开成就 (预留)
+│
+└─ 数据同步:
+    ├─ 本地积分变化 → 批量同步到云端
+    ├─ 排行榜每日 00:00 刷新
+    └─ 全局仅显示 Top 100
+```
+
+### 12.5 接口定义
+
+```
+GET /api/v1/game/leaderboard?type=global&limit=50
+Authorization: Bearer ***
+
+Response:
+{
+  "my_rank": 42,
+  "total_users": 1250,
+  "leaderboard": [
+    {"rank": 1, "nickname": "学霸小明", "score": 8250, "avatar_url": "..."},
+    {"rank": 2, "nickname": "物理达人", "score": 7900, "avatar_url": "..."},
+    {"rank": 42, "nickname": "我", "score": 2340, "avatar_url": "..."}
+  ],
+  "updated_at": "2026-05-15T00:00:00Z"
+}
+
+POST /api/v1/game/sync/score
+{
+  "total_score": 2340,
+  "current_streak": 7,
+  "longest_streak": 14,
+  "achievements_unlocked": ["first_solve", "streak_7"],
+  "date": "2026-05-15"
+}
+
+Response:
+{
+  "synced": true,
+  "global_rank": 42,
+  "new_achievements": []     // 云端检测到的成就（预留）
+}
+```
+
+### 12.6 Room 实体模型
+
+```kotlin
+// 成就
+@Entity(tableName = "achievements")
+data class AchievementEntity(
+    @PrimaryKey val id: String,           // "first_solve"
+    val title: String,
+    val description: String,
+    val iconName: String,
+    val status: String,                    // LOCKED / UNLOCKED
+    val unlockedAt: Long?,
+    val progress: Float = 0f              // 解锁进度 0.0~1.0
+)
+
+// 用户积分
+@Entity(tableName = "user_scores")
+data class UserScoreEntity(
+    @PrimaryKey val id: String = "user_score",
+    val totalScore: Int,
+    val currentStreak: Int,
+    val longestStreak: Int,
+    val lastLearningDate: String?,         // "2026-05-15"
+    val updatedAt: Long
+)
+
+// 积分变更日志 (用于审计/回滚)
+@Entity(tableName = "score_logs")
+data class ScoreLogEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val eventType: String,                 // SOLVE / CHAT / QUIZ / REVIEW / STREAK
+    val scoreChange: Int,                  // +10 / -0
+    val balanceAfter: Int,                 // 变更后余额
+    val createdAt: Long
+)
+
+@Dao
+interface AchievementDao {
+    @Query("SELECT * FROM achievements WHERE status = 'LOCKED'")
+    fun getLockedAchievements(): Flow<List<AchievementEntity>>
+    
+    @Query("SELECT * FROM achievements ORDER BY status ASC, id ASC")
+    fun getAllAchievements(): Flow<List<AchievementEntity>>
+    
+    @Query("UPDATE achievements SET status = 'UNLOCKED', unlockedAt = :now WHERE id = :id")
+    suspend fun unlock(id: String, now: Long)
+    
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdate(achievement: AchievementEntity)
+    
+    @Query("SELECT COUNT(*) FROM achievements WHERE status = 'UNLOCKED'")
+    fun getUnlockedCount(): Flow<Int>
+}
+```
+
+### 12.7 关键类
+
+```
+domain/engine/
+├── GamificationEngine.kt       (新建: 游戏化引擎)
+└── StreakCalculator.kt         (新建: 连胜计算器)
+
+data/
+├── local/
+│   ├── dao/AchievementDao.kt   (新建)
+│   ├── dao/UserScoreDao.kt     (新建)
+│   ├── dao/ScoreLogDao.kt      (新建)
+│   ├── entity/AchievementEntity.kt (新建)
+│   ├── entity/UserScoreEntity.kt   (新建)
+│   └── entity/ScoreLogEntity.kt    (新建)
+├── remote/
+│   └── api/GamificationApi.kt  (新建)
+└── repository/
+    └── GamificationRepository.kt (新建: 接口+实现)
+
+ui/screen/dashboard/components/
+├── AchievementBadge.kt         (新建: 成就徽章网格)
+├── StreakIndicator.kt          (新建: 连胜火焰指示器)
+└── LeaderboardView.kt          (新建: 排行榜)
+
+domain/model/
+└── Achievement.kt              (新建: 成就领域枚举)
+```
+
+### 12.8 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 游戏化数据无法云端同步 | 本地重置后积分丢失 | 每次修改后也同步到云端；本地优先+云端备份 |
+| 成就条件误判导致提前解锁 | 逻辑缺陷 | 条件检查在 domain 层纯函数实现，无副作用 |
+| 排行榜数据滞后 | 排名不准确 | 每日批量更新；客户端进度条显示"今日更新" |
+| 游戏化导致用户过度关注分数 | 偏离学习目标 | 成就侧重于学习行为本身 (连续学习) 而非竞争 |
+| 积分计算与云端不一致 | 本地与云端分歧 | 云端为主导；每次 sync 时以云端数据覆盖本地 |
+
+---
+
+## 附录 A 补充: 新增文件清单 (F16/F18/F20/F23/F24/F30/F31/F32/F46)
+
+以下文件为上述 §7-§12 各模块的新增文件，与现有附录 A (F40-F45) 合并构成完整清单：
+
+| 文件路径 | 所属模块 | 说明 |
+|---------|---------|------|
+| `domain/model/VoiceState.kt` | F16/F18/F20 | 统一语音状态机定义 |
+| `domain/model/SubscriptionState.kt` | F30 | 订阅领域模型 |
+| `domain/model/FeatureType.kt` | F30 | 功能类型枚举 |
+| `domain/model/Achievement.kt` | F46 | 成就领域枚举 |
+| `domain/engine/GamificationEngine.kt` | F46 | 游戏化引擎 |
+| `domain/engine/StreakCalculator.kt` | F46 | 连胜计算器 |
+| `data/media/CloudAsrEngine.kt` | F16 | 云端 ASR 调用封装 |
+| `data/media/CloudTtsEngine.kt` | F18 | 云端 TTS 流式封装 |
+| `data/media/TtsAudioPlayer.kt` | F18 | AudioTrack 播放器 |
+| `data/media/AsrFallbackStrategy.kt` | F16 | ASR 降级判定逻辑 |
+| `data/media/NoiseSuppression.kt` | F47 (可选) | 环境自适应降噪 |
+| `data/vision/OcrEngine.kt` | F23 | ML Kit OCR 引擎封装 |
+| `data/vision/OcrGraphicOverlay.kt` | F23 | OCR 取景框叠加层 |
+| `data/vision/SubjectDetector.kt` | F23 | 学科预检测器 |
+| `data/local/CacheManager.kt` | F31 | 缓存清理管理器 |
+| `data/local/NotificationHelper.kt` | F32 | 本地通知辅助类 |
+| `data/local/NotificationChannels.kt` | F32 | 通知渠道定义 |
+| `data/local/dao/SubscriptionCacheDao.kt` | F30 | 订阅缓存 DAO |
+| `data/local/dao/AchievementDao.kt` | F46 | 成就 DAO |
+| `data/local/dao/UserScoreDao.kt` | F46 | 用户积分 DAO |
+| `data/local/dao/ScoreLogDao.kt` | F46 | 积分日志 DAO |
+| `data/local/entity/SubscriptionCacheEntity.kt` | F30 | 订阅缓存 Entity |
+| `data/local/entity/AchievementEntity.kt` | F46 | 成就 Entity |
+| `data/local/entity/UserScoreEntity.kt` | F46 | 积分 Entity |
+| `data/local/entity/ScoreLogEntity.kt` | F46 | 积分日志 Entity |
+| `data/remote/api/SubscriptionApi.kt` | F30 | 订阅 API |
+| `data/remote/api/GamificationApi.kt` | F46 | 游戏化 API (排行榜/同步) |
+| `data/repository/SubscriptionRepository.kt` | F30 | 订阅仓库 (接口+实现) |
+| `data/repository/GamificationRepository.kt` | F46 | 游戏化仓库 (接口+实现) |
+| `data/model/QuotaGuard.kt` | F30 | 全局配额守卫 |
+| `ui/screen/chat/components/ImageMessage.kt` | F24 | 图片消息组件 |
+| `ui/screen/chat/components/PhotoPreviewDialog.kt` | F24 | 全屏图片预览 |
+| `ui/screen/dashboard/components/AchievementBadge.kt` | F46 | 成就徽章组件 |
+| `ui/screen/dashboard/components/StreakIndicator.kt` | F46 | 连胜指示器 |
+| `ui/screen/dashboard/components/LeaderboardView.kt` | F46 | 排行榜组件 |
+
+### 修改文件清单
+
+| 文件路径 | 所属模块 | 修改内容 |
+|---------|---------|---------|
+| `data/media/VoiceRepository.kt` | F16/F18/F20 | 降级逻辑 + 打断协调 |
+| `ui/screen/chat/components/VoiceInputBar.kt` | F20 | 打断交互流畅化 |
+| `ui/screen/chat/components/MessageBubble.kt` | F24 | 添加图片类型分支 |
+| `ui/screen/chat/ChatViewModel.kt` | F30 | 接入 QuotaGuard 配额检查 |
+| `ui/screen/camera/CameraScreen.kt` | F23 | ML Kit OCR 叠加层集成 |
+| `ui/screen/settings/SettingsScreen.kt` | F31/F32 | 添加清除缓存 + 通知入口 |
+| `ui/screen/subscription/SubscriptionScreen.kt` | F30 | 绑定真实后端数据 |
+| `ui/screen/subscription/SubscriptionViewModel.kt` | F30 | API 对接 |
+| `AndroidManifest.xml` | F32 | POST_NOTIFICATIONS 权限声明 |
+| `ui/screen/dashboard/DashboardScreen.kt` | F46 | 集成成就/连胜组件 |
+
+---
+
+## 附录 B 补充: 完整模块依赖关系总图 (F40-F46)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                     F40-F46 完整模块依赖关系 (含 P1/P2)                      │
+│                                                                             │
+│  ┌──────────────────────┐                                                    │
+│  │  现有架构 (P0基础)    │                                                    │
+│  │  ├─ 认证/会话/消息   │                                                    │
+│  │  └─ T4 T5 T7 T8 T12  │                                                    │
+│  │    T13 T14 T17 T20   │                                                    │
+│  └──────────┬───────────┘                                                    │
+│             │                                                                │
+│  ┌──────────┴─────────────────────────────────────────────────────────────┐ │
+│  │  Sprint 1: P0 核心补齐 (可并行)                                        │ │
+│  │                                                                        │ │
+│  │  ┌──────────────────────────────────────────┐                           │ │
+│  │  │ T22 — F40 拍照解题增强                    │                           │ │
+│  │  │ 依赖: T5(SSE) + T8(拍照) + F23(OCR)       │                           │ │
+│  │  │ 产出: SubjectSelector + SolveStreamParser │                           │ │
+│  │  └──────────────────────────────────────────┘                           │ │
+│  │                                                                        │ │
+│  │  ┌──────────────────────────────────────────┐                           │ │
+│  │  │ T23 — F41 自适应分步讲解                  │                           │ │
+│  │  │ 依赖: T4(聊天) + T5(SSE) + UserProfile   │                           │ │
+│  │  │ 产出: CollapsibleStepCard + Difficulty   │                           │ │
+│  │  └──────────────────────────────────────────┘                           │ │
+│  │                                                                        │ │
+│  │  ┌──────────────────────────────────────────┐                           │ │
+│  │  │ T24 — F42 苏格拉底式教学                  │                           │ │
+│  │  │ 依赖: T4 + T5 + T14(仪表盘数据)          │                           │ │
+│  │  │ 产出: SocraticBanner + TeachingState     │                           │ │
+│  │  └──────────────────────────────────────────┘                           │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│             │                                                                │
+│  ┌──────────┴─────────────────────────────────────────────────────────────┐ │
+│  │  Sprint 2: P1 语音完善 + 图片消息                                      │ │
+│  │                                                                        │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │ │
+│  │  │ T25 — F16    │  │ T26 — F18+F20│  │ T27 — F24   │                  │ │
+│  │  │ 云端ASR备选  │  │ 云端TTS+打断 │  │ 图片消息渲染 │                  │ │
+│  │  │ 依赖: T12    │  │ 依赖: T13    │  │ 依赖: T4+T8 │                  │ │
+│  │  │ CloudAsrEngine│ │ CloudTts    │  │ ImageMsg    │                  │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                  │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│             │                                                                │
+│  ┌──────────┴─────────────────────────────────────────────────────────────┐ │
+│  │  Sprint 3: P2 体验补齐 + 游戏化                                        │ │
+│  │                                                                        │ │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                  │ │
+│  │  │ T28 — F30    │  │ T29 — F31+F32│  │ T30 — F46   │                  │ │
+│  │  │ 订阅绑定     │  │ 缓存+通知    │  │ 游戏化系统  │                  │ │
+│  │  │ 依赖: T20    │  │ 依赖: T7+T17 │  │ 依赖: T14   │                  │ │
+│  │  │ SubApi+Guard │  │ Cache+Notify │  │ GamifEngine │                  │ │
+│  │  └──────────────┘  └──────────────┘  └──────────────┘                  │ │
+│  │                                                                        │ │
+│  │  ┌──────────────┐                                                      │ │
+│  │  │ T31 — F47    │  (可选 Sprint 4)                                     │ │
+│  │  │ 语音增强     │                                                      │ │
+│  │  │ 依赖: T12+T13│                                                      │ │
+│  │  └──────────────┘                                                      │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                             │
+│  并行策略:                                                                   │
+│  ├─ Sprint 1: T22/T23/T24 无互依赖 → 2 Coder 并行                           │
+│  ├─ Sprint 2: T25/T26/T27 无互依赖 → 2 Coder 并行                           │
+│  └─ Sprint 3: T28/T29/T30 无互依赖 → 2 Coder 并行                           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```

@@ -1,6 +1,7 @@
 package com.aitutor.app.data.remote.api
 
 import com.aitutor.app.data.remote.dto.*
+import com.aitutor.app.data.media.CloudAsrResponse
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -46,6 +47,9 @@ interface AiTutorApi {
     @POST("api/v1/solve/photo")
     suspend fun solvePhoto(@Part photo: MultipartBody.Part): Response<ApiResponse<SolvePhotoResponse>>
 
+    @POST("api/v1/solve/step/retry")
+    suspend fun solveRetryStep(@Body request: SolveRetryRequest): Response<ApiResponse<String>>
+
     // Streaming image upload (with conversation_id)
     @Multipart
     @POST("api/v1/chat/image")
@@ -61,4 +65,11 @@ interface AiTutorApi {
     // Health
     @GET("api/v1/health")
     suspend fun health(): Response<ApiResponse<Map<String, String>>>
+
+    // Cloud ASR
+    @Multipart
+    @POST("api/v1/voice/asr")
+    suspend fun cloudAsr(
+        @Part audio: MultipartBody.Part
+    ): Response<ApiResponse<CloudAsrResponse>>
 }

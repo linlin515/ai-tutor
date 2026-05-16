@@ -2,26 +2,46 @@ package com.aitutor.app.ui.chat.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material.icons.filled.Error
-import androidx.compose.material3.*
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.MessageStatus
+import com.aitutor.app.domain.model.MessageType
 import com.aitutor.app.ui.common.MarkdownText
+import com.aitutor.app.ui.screen.chat.components.ImageMessage
+import com.aitutor.app.ui.screen.chat.components.PhotoPreviewDialog
 
 @Composable
 fun MessageBubble(
     message: ChatMessage,
     onRetry: (() -> Unit)? = null,
     onSpeak: (() -> Unit)? = null,
+    onImageLoadRetry: (() -> Unit)? = null,  // F24: 图片重新加载
     modifier: Modifier = Modifier
 ) {
     val isUser = message.isUser
@@ -46,6 +66,9 @@ fun MessageBubble(
             bottomStart = 4.dp, bottomEnd = 16.dp
         )
     }
+
+    // F24: 全屏预览弹窗控制
+    var showPhotoPreview by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier
@@ -80,15 +103,34 @@ fun MessageBubble(
                     .background(bubbleColor)
                     .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                if (message.contentType == com.aitutor.app.domain.model.MessageType.TEXT) {
-                    if (isUser) {
+                when (message.contentType) {
+                    MessageType.TEXT -> {
+                        if (isUser) {
+                            Text(
+                                text = message.content,
+                                color = textColor,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        } else {
+                            MarkdownText(text = message.content)
+                        }
+                    }
+                    MessageType.IMAGE -> {
+                        // F24: 图片消息分支
+                        ImageMessage(
+                            url = message.content,
+                            isMine = isUser,
+                            onRetry = { onImageLoadRetry?.invoke() },
+                            onClick = { showPhotoPreview = true }
+                        )
+                    }
+                    MessageType.AUDIO -> {
+                        // AUDIO 类型的占位渲染
                         Text(
-                            text = message.content,
+                            text = "[语音消息]",
                             color = textColor,
                             style = MaterialTheme.typography.bodyLarge
                         )
-                    } else {
-                        MarkdownText(text = message.content)
                     }
                 }
             }
@@ -132,5 +174,13 @@ fun MessageBubble(
         if (isUser) {
             Spacer(modifier = Modifier.width(4.dp))
         }
+    }
+
+    // F24: 全屏预览弹窗
+    if (showPhotoPreview && message.contentType == MessageType.IMAGE) {
+        PhotoPreviewDialog(
+            url = message.content,
+            onDismiss = { showPhotoPreview = false }
+        )
     }
 }

@@ -2,11 +2,14 @@ package com.aitutor.app.di
 
 import android.content.Context
 import androidx.room.Room
+import com.aitutor.app.data.local.dao.AchievementDao
 import com.aitutor.app.data.local.dao.AnalyticsDao
 import com.aitutor.app.data.local.dao.ConversationDao
 import com.aitutor.app.data.local.dao.MessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
+import com.aitutor.app.data.local.dao.SubscriptionCacheDao
+import com.aitutor.app.data.local.dao.UserScoreDao
 import com.aitutor.app.data.local.dao.WrongAnswerDao
 import com.aitutor.app.data.local.db.AiTutorDatabase
 import dagger.Module
@@ -66,5 +69,23 @@ object DatabaseModule {
     @Singleton
     fun provideWrongAnswerDao(database: AiTutorDatabase): WrongAnswerDao {
         return database.wrongAnswerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideAchievementDao(database: AiTutorDatabase): AchievementDao {
+        return database.achievementDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideUserScoreDao(database: AiTutorDatabase): UserScoreDao {
+        return database.userScoreDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSubscriptionCacheDao(database: AiTutorDatabase): SubscriptionCacheDao {
+        return database.subscriptionCacheDao()
     }
 }

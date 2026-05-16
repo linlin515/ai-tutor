@@ -83,6 +83,23 @@ fun DashboardScreen(
                             .height(250.dp)
                     )
 
+                    // F46 游戏化数据展示
+                    // 连胜指示器
+                    StreakIndicator(
+                        streak = uiState.streak
+                    )
+
+                    // 成就徽章区
+                    AchievementGrid(
+                        achievements = uiState.achievements
+                    )
+
+                    // 排行榜
+                    LeaderboardView(
+                        rankings = uiState.rankings,
+                        isLoading = uiState.isLoading
+                    )
+
                     Spacer(modifier = Modifier.height(16.dp))
                 }
             }

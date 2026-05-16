@@ -1,4 +1,5 @@
 package com.aitutor.app.ui.camera
+
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -7,9 +8,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,22 +20,29 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import androidx.core.content.FileProvider
 import androidx.hilt.navigation.compose.hiltViewModel
 import coil.compose.AsyncImage
+import com.aitutor.app.ui.screen.camera.components.SubjectSelector
+import com.google.mlkit.vision.common.InputImage
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalGetImage::class)
 @Composable
 fun CameraScreen(
     onNavigateToChat: (String) -> Unit = {},
@@ -154,10 +164,94 @@ fun CameraScreen(
                         }
                     }
 
-                    if (state.isAnalyzing) {
-                        CircularProgressIndicator()
+                    // Subject selector (only when not yet analyzing)
+                    if (!state.isAnalyzing && state.analysisResult == null) {
+                        SubjectSelector(
+                            selectedSubject = state.selectedSubject,
+                            onSubjectChanged = { viewModel.onSubjectChanged(it) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                        )
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("AI 分析中...")
+                    }
+
+                    if (state.isAnalyzing) {
+                        if (state.isCompressing) {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("图片压缩中...")
+                        } else if (state.solveEvents.isNotEmpty()) {
+                            // Show live solve events
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(0.3f)
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "AI 分析中...",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+
+                                // Show latest OCR result
+                                val lastOcr = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Ocr>().lastOrNull()
+                                if (lastOcr != null) {
+                                    Card(
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(8.dp)) {
+                                            Text(
+                                                text = "识别结果:",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = lastOcr.text.take(100) + if (lastOcr.text.length > 100) "..." else "",
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                    }
+                                }
+
+                                // Show step progress
+                                val currentStep = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>().lastOrNull()
+                                if (currentStep != null) {
+                                    LinearProgressIndicator(
+                                        progress = { currentStep.step.toFloat() / currentStep.total.toFloat() },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(4.dp),
+                                        color = MaterialTheme.colorScheme.primary,
+                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "步骤 ${currentStep.step}/${currentStep.total}: ${currentStep.title}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "正在生成解答...",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        } else {
+                            CircularProgressIndicator()
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("AI 分析中...")
+                        }
                     } else if (state.analysisResult != null) {
                         // Analysis done
                         Text(
@@ -166,6 +260,32 @@ fun CameraScreen(
                             color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.height(8.dp))
+
+                        // Show latest steps summary
+                        val steps = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>()
+                        if (steps.isNotEmpty()) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(0.2f)
+                                    .padding(horizontal = 16.dp),
+                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "解题步骤:",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                steps.forEach { step ->
+                                    Text(
+                                        text = "步骤 ${step.step}/${step.total}: ${step.title}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+
                         Button(onClick = {
                             val convId = state.conversationId
                             viewModel.resetState()
@@ -218,7 +338,7 @@ fun CameraScreen(
             } else {
                 // Camera preview
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // CameraX Preview + ImageCapture
+                    // CameraX Preview + ImageCapture + ImageAnalysis (ML Kit OCR)
                     AndroidView(
                         factory = { ctx ->
                             PreviewView(ctx).apply {
@@ -235,6 +355,16 @@ fun CameraScreen(
                                         .build()
                                     imageCapture = imageCaptureBuilder
 
+                                    // --- ML Kit OCR: ImageAnalysis use case ---
+                                    val imageAnalysis = ImageAnalysis.Builder()
+                                        .setTargetResolution(android.util.Size(1280, 720))
+                                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                                        .setTargetRotation(this@apply.display?.rotation ?: 0)
+                                        .build()
+                                    imageAnalysis.setAnalyzer(cameraExecutor) { imageProxy ->
+                                        analyzeOcrFrame(imageProxy, viewModel)
+                                    }
+
                                     val cameraSelector = if (lensFacing == CameraSelector.LENS_FACING_FRONT)
                                         CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                                     try {
@@ -243,7 +373,8 @@ fun CameraScreen(
                                             lifecycleOwner,
                                             cameraSelector,
                                             preview,
-                                            imageCaptureBuilder
+                                            imageCaptureBuilder,
+                                            imageAnalysis
                                         )
                                     } catch (e: Exception) {
                                         e.printStackTrace()
@@ -253,6 +384,61 @@ fun CameraScreen(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    // OCR Canvas overlay: draws bounding boxes on top of camera preview
+                    Canvas(modifier = Modifier.fillMaxSize()) {
+                        drawOcrOverlay(
+                            viewModel = viewModel,
+                            canvasWidth = size.width,
+                            canvasHeight = size.height
+                        )
+                    }
+
+                    // Subject selector overlay at top
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        color = Color.Black.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(bottomStart = 16.dp, bottomEnd = 16.dp)
+                    ) {
+                        SubjectSelector(
+                            selectedSubject = state.selectedSubject,
+                            onSubjectChanged = { viewModel.onSubjectChanged(it) },
+                            modifier = Modifier.padding(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = 8.dp
+                            )
+                        )
+                    }
+
+                    // OCR bottom card: shows detected text floating above controls
+                    val ocrBoxes = viewModel.ocrResults
+                    if (ocrBoxes.isNotEmpty()) {
+                        Card(
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .padding(bottom = 100.dp, start = 16.dp, end = 16.dp)
+                                .fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = Color.Black.copy(alpha = 0.7f)
+                            )
+                        ) {
+                            val displayText = ocrBoxes.joinToString("  ") { it.text }
+                            Text(
+                                text = displayText,
+                                modifier = Modifier.padding(12.dp),
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
 
                     // Bottom controls
                     Row(
@@ -332,5 +518,138 @@ fun CameraScreen(
                 }
             }
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// ML Kit OCR helper: runs on every camera frame via ImageAnalysis.Analyzer
+// ---------------------------------------------------------------------------
+@OptIn(ExperimentalGetImage::class)
+private fun analyzeOcrFrame(
+    imageProxy: ImageProxy,
+    viewModel: CameraViewModel
+) {
+    val mediaImage = imageProxy.image
+    if (mediaImage == null) {
+        imageProxy.close()
+        return
+    }
+
+    val rotationDegrees = imageProxy.imageInfo.rotationDegrees
+    val inputImage = InputImage.fromMediaImage(mediaImage, rotationDegrees)
+
+    viewModel.textRecognizer.process(inputImage)
+        .addOnSuccessListener { visionText ->
+            val boxes = mutableListOf<OcrBoundingBox>()
+            for (block in visionText.textBlocks) {
+                val box = block.boundingBox ?: continue
+                boxes.add(
+                    OcrBoundingBox(
+                        text = block.text,
+                        left = box.left,
+                        top = box.top,
+                        right = box.right,
+                        bottom = box.bottom
+                    )
+                )
+            }
+            viewModel.onOcrResult(
+                boxes = boxes,
+                frameWidth = imageProxy.width,
+                frameHeight = imageProxy.height,
+                rotationDegrees = rotationDegrees
+            )
+        }
+        .addOnCompleteListener {
+            imageProxy.close()
+        }
+}
+
+// ---------------------------------------------------------------------------
+// OCR overlay drawing function (called from Canvas DrawScope)
+// ---------------------------------------------------------------------------
+private fun DrawScope.drawOcrOverlay(
+    viewModel: CameraViewModel,
+    canvasWidth: Float,
+    canvasHeight: Float
+) {
+    val boxes = viewModel.ocrResults
+    val imgWidth = viewModel.ocrFrameWidth
+    val imgHeight = viewModel.ocrFrameHeight
+    val rotation = viewModel.ocrRotationDegrees
+
+    if (boxes.isEmpty() || imgWidth <= 0 || imgHeight <= 0) return
+
+    // Effective display dimensions after applying rotation
+    val (displayWidth, displayHeight) = if (rotation == 90 || rotation == 270) {
+        imgHeight.toFloat() to imgWidth.toFloat()
+    } else {
+        imgWidth.toFloat() to imgHeight.toFloat()
+    }
+
+    val scaleX = canvasWidth / displayWidth
+    val scaleY = canvasHeight / displayHeight
+
+    for (box in boxes) {
+        // Transform from raw image space to display space (handle rotation)
+        val (dl, dt, dr, db) = when (rotation) {
+            0 -> {
+                val l = box.left.toFloat()
+                val t = box.top.toFloat()
+                val r = box.right.toFloat()
+                val b = box.bottom.toFloat()
+                floatArrayOf(l, t, r, b)
+            }
+            90 -> {
+                // Image rotated 90° clockwise: (x, y) -> (y, imgWidth - x)
+                val l = box.top.toFloat()
+                val t = (imgWidth - box.right).toFloat()
+                val r = box.bottom.toFloat()
+                val b = (imgWidth - box.left).toFloat()
+                floatArrayOf(l, t, r, b)
+            }
+            180 -> {
+                val l = (imgWidth - box.right).toFloat()
+                val t = (imgHeight - box.bottom).toFloat()
+                val r = (imgWidth - box.left).toFloat()
+                val b = (imgHeight - box.top).toFloat()
+                floatArrayOf(l, t, r, b)
+            }
+            270 -> {
+                // Image rotated 270° clockwise: (x, y) -> (imgHeight - y, x)
+                val l = (imgHeight - box.bottom).toFloat()
+                val t = box.left.toFloat()
+                val r = (imgHeight - box.top).toFloat()
+                val b = box.right.toFloat()
+                floatArrayOf(l, t, r, b)
+            }
+            else -> {
+                floatArrayOf(
+                    box.left.toFloat(), box.top.toFloat(),
+                    box.right.toFloat(), box.bottom.toFloat()
+                )
+            }
+        }
+
+        // Scale to canvas pixel coordinates
+        val left = dl * scaleX
+        val top = dt * scaleY
+        val right = dr * scaleX
+        val bottom = db * scaleY
+
+        // Semi-transparent green fill to highlight text region
+        drawRect(
+            color = Color(0x2200FF00),
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top)
+        )
+
+        // Green outline stroke
+        drawRect(
+            color = Color(0xFF00FF00),
+            topLeft = Offset(left, top),
+            size = Size(right - left, bottom - top),
+            style = Stroke(width = 2.dp.toPx())
+        )
     }
 }

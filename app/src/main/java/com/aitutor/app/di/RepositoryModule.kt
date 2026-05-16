@@ -3,15 +3,21 @@ package com.aitutor.app.di
 import com.aitutor.app.data.repository.AnalyticsRepositoryImpl
 import com.aitutor.app.data.repository.AuthRepositoryImpl
 import com.aitutor.app.data.repository.ChatRepositoryImpl
+import com.aitutor.app.data.repository.GamificationRepositoryImpl
 import com.aitutor.app.data.repository.QuizRepositoryImpl
 import com.aitutor.app.data.repository.SettingsRepositoryImpl
+import com.aitutor.app.data.repository.SolveRepositoryImpl
+import com.aitutor.app.data.repository.SubscriptionRepositoryImpl
 import com.aitutor.app.data.repository.VoiceRepositoryImpl
 import com.aitutor.app.data.repository.WrongAnswerRepositoryImpl
 import com.aitutor.app.domain.repository.AnalyticsRepository
 import com.aitutor.app.domain.repository.AuthRepository
 import com.aitutor.app.domain.repository.ChatRepository
+import com.aitutor.app.domain.repository.GamificationRepository
 import com.aitutor.app.domain.repository.QuizRepository
 import com.aitutor.app.domain.repository.SettingsRepository
+import com.aitutor.app.domain.repository.SolveRepository
+import com.aitutor.app.domain.repository.SubscriptionRepository
 import com.aitutor.app.domain.repository.VoiceRepository
 import com.aitutor.app.domain.repository.WrongAnswerRepository
 import dagger.Binds
@@ -51,4 +57,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindWrongAnswerRepository(impl: WrongAnswerRepositoryImpl): WrongAnswerRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSolveRepository(impl: SolveRepositoryImpl): SolveRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindGamificationRepository(impl: GamificationRepositoryImpl): GamificationRepository
 }

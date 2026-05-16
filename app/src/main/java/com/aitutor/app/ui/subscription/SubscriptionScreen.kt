@@ -248,7 +248,7 @@ fun PlanCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.CheckCircle,
+                        Icons.Default.Check,
                         contentDescription = null,
                         tint = if (isRecommended) accentColor else MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)

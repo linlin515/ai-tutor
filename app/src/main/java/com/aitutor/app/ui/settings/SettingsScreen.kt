@@ -1,17 +1,22 @@
 package com.aitutor.app.ui.settings
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aitutor.app.data.local.CacheSize
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
 import kotlin.math.roundToInt
@@ -167,7 +172,88 @@ fun SettingsScreen(
             supportingContent = { Text("v1.0.0 (build 1)") }
         )
 
+        // Cache clearing
+        val cacheSize by viewModel.cacheSize.collectAsState()
+        val cacheClearing by viewModel.cacheClearing.collectAsState()
+        val cacheProgress by viewModel.cacheProgress.collectAsState()
+        val cacheClearedBytes by viewModel.cacheClearedBytes.collectAsState()
+        var showClearDialog by remember { mutableStateOf(false) }
+        val context = LocalContext.current
+
+        ListItem(
+            headlineContent = { Text("清除缓存") },
+            supportingContent = {
+                Text(
+                    if (cacheClearing) "正在清除…" else formatCacheSize(cacheSize.total)
+                )
+            },
+            leadingContent = {
+                Icon(Icons.Default.Delete, contentDescription = null)
+            },
+            modifier = Modifier.clickable(enabled = !cacheClearing) {
+                if (cacheSize.total > 0) {
+                    showClearDialog = true
+                } else {
+                    Toast.makeText(context, "缓存已清空", Toast.LENGTH_SHORT).show()
+                }
+            }
+        )
+
+        // Clear progress indicator
+        if (cacheClearing) {
+            LinearProgressIndicator(
+                progress = { cacheProgress },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            )
+        }
+
+        // Clear confirmation dialog
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                title = { Text("清除缓存") },
+                text = {
+                    Text("确定要清除 ${formatCacheSize(cacheSize.total)} 的缓存数据吗？")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showClearDialog = false
+                        viewModel.clearCache()
+                    }) {
+                        Text("确定")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+
+        // Toast when clear completes
+        LaunchedEffect(cacheClearedBytes) {
+            if (!cacheClearing && cacheClearedBytes > 0) {
+                val mb = cacheClearedBytes / (1024.0 * 1024.0)
+                Toast.makeText(
+                    context,
+                    "已清除 ${"%.1f".format(mb)} MB 缓存",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
         Spacer(modifier = Modifier.height(32.dp))
+    }
+}
+
+private fun formatCacheSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
     }
 }
 

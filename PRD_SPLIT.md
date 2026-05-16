@@ -545,43 +545,279 @@
 
 ---
 
-## 任务依赖全景图
-
-```
-T1 脚手架 ──────┬── T2 认证 ─── T20 个人中心
-                ├── T3 会话管理 ─── T4 聊天界面
-                │                   ├── T5 SSE 流式
-                │                   ├── T6 Markdown渲染
-                │                   └── T7 持久化
-                ├── T8 拍照基础 ─── T9 拍照增强
-                ├── T10 自适应讲解 ─── T12 ASR ─── T13 TTS+打断
-                ├── T11 苏格拉底式         └── T19 语音增强
-                └── T14 仪表盘 ─── T15 测验 ─── T16 间隔重复
-                                  └── T18 游戏化
-```
-
-**任务启动条件：** 一个任务的所有依赖（表中"依赖"列）为 ✅ 即可启动。
-**并行策略：** T1→T2 + T3 可并行；T4→T5 + T6 可并行；T8 + T10 + T11 可并行。
+> 以上 T1-T21 为 Phase 1~3 原始拆分，以下 T22-T31 为补齐冲刺新增。
 
 ---
 
-## 排期总览
+## Phase 4A — P0 核心补齐（补全冲刺）
+
+> Sprint 1 | 第 1-2 周 | 预计总工时：12-16 人日 | 2 Coder 并行（无互依赖）
+
+### T22 — F40 拍照解题增强：全学科 + SSE 流式
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T22 |
+| **优先级** | P0 |
+| **功能** | 全学科 OCR + 学科选择器 + 流式分步解题完成 |
+| **负责** | Coder-A (Integration) + Coder-B (UI) |
+| **依赖** | T5 (SSE) ✅, T8 (拍照基础) ✅ |
+| **工作量** | M (5 人日) |
+| **PRD 章节** | §2.2 F40, §4.7-CameraScreen, §9.1-F40 |
+| **AC 关联** | AC34, AC35, AC36, PERF07 |
+| **创建/修改文件** | |
+| | `ui/screen/camera/components/SubjectSelector.kt` — 新增学科选择器 |
+| | `data/remote/stream/SolveStreamParser.kt` — 新增解题 SSE 流解析器 |
+| | `data/repository/SolveRepository.kt` — 新建/修改 |
+| | `ui/screen/chat/components/StepByStepCard.kt` — 新增分步卡片组件 |
+| | `ui/screen/camera/CameraScreen.kt` — 修改：集成 SubjectSelector |
+| | `data/remote/api/SolveApi.kt` — 修改：学科参数 + SSE 端点 |
+| **描述** | 在已有基础拍照解题上完成增强：(1) 学科选择器（数学/物理/化学/生物/语文/英语/自动），拍照前可选；(2) 解题结果通过 SSE 流式逐步骤返回，渲染为 Step 1/N 分步卡片；(3) 端到端延迟 ≤5s。保留并增强已有拍照上传功能。 |
+
+### T23 — F41 自适应分步讲解
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T23 |
+| **优先级** | P0 |
+| **功能** | 年级自适应讲解、步骤折叠、难度切换 |
+| **负责** | Coder-B (UI) + 后端 (Prompt Engineering) |
+| **依赖** | T4 (聊天界面) ✅, T5 (SSE) ✅, UserProfile 年级信息 |
+| **工作量** | M (4 人日) |
+| **PRD 章节** | §2.2 F41, §5.6-自适应分步讲解, §9.1-F41 |
+| **AC 关联** | AC37, AC38, AC39 |
+| **创建/修改文件** | |
+| | `ui/screen/chat/components/CollapsibleStepCard.kt` — 新增可折叠步骤卡片 |
+| | `ui/screen/chat/components/DifficultySwitcher.kt` — 新增难度切换按钮 |
+| | `ui/screen/chat/components/StepProgressIndicator.kt` — 新增步骤进度指示器 |
+| | `data/repository/UserProfileRepository.kt` — 新建/修改用户年级信息读取 |
+| | `ui/screen/chat/ChatScreen.kt` — 修改：集成步骤卡片 |
+| | `data/repository/ChatRepository.kt` — 修改：grade 参数传递 |
+| **描述** | AI 回复以 Step 1/N 结构化块 SSE 流式渲染。步骤卡片可展开/折叠，底部「没看懂」按钮→补充说明。用户年级字段（小学/初中/高中/大学）作为 prompt 上下文自动调整详细程度。手动切换难度后重新生成。年级缺失默认「初中」。 |
+
+### T24 — F42 AI 对话式教学增强（苏格拉底式）
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T24 |
+| **优先级** | P0 |
+| **功能** | 苏格拉底式引导提问 + 理解度评估 |
+| **负责** | Coder-B (UI) + 后端 (Prompt Engineering) |
+| **依赖** | T4 ✅, T5 ✅, T14 (F43 理解度记录) |
+| **工作量** | M (5 人日) |
+| **PRD 章节** | §2.2 F42, §5.7-Socratic流程, §9.1-F42 |
+| **AC 关联** | AC40, AC41, AC42 |
+| **创建/修改文件** | |
+| | `domain/model/ChatMode.kt` — 新增 ChatMode 枚举 (ASSISTANT/TUTOR/QUIZ) |
+| | `domain/model/TeachingState.kt` — 新增教学状态模型 |
+| | `ui/screen/chat/components/SocraticBanner.kt` — 新增教学模式横幅 |
+| | `ui/screen/chat/components/TeachingModeToggle.kt` — 新增教学模式切换 |
+| | `ui/screen/chat/components/SocraticQuestionBubble.kt` — 新增引导问题气泡 |
+| | `ui/screen/chat/components/UnderstandingBadge.kt` — 新增理解度徽章 |
+| | `ui/screen/chat/ChatViewModel.kt` — 修改：ChatMode 状态管理 |
+| | `ui/screen/chat/ChatScreen.kt` — 修改：教学 UI 集成 |
+| | `data/repository/LearningProgressRepository.kt` — 修改：理解度记录 |
+| **描述** | AI 检测学习型问题→自动进入苏格拉底式教学：概念拆解→引导提问→用户回答→正确性判断→逐步深入→总结归纳。引导问题以紫色气泡展示，SocraticBanner 指示当前模式。用户可输入"直接给我答案"退出。教学结束生成理解度评估（已掌握/需加强）。30 分钟无交互自动退出。 |
+
+---
+
+## Phase 4B — P1 语音完善 + 图片消息（补全冲刺）
+
+> Sprint 2 | 第 3 周 | 预计总工时：7-9 人日 | 2 Coder 并行
+
+### T25 — F16 云端 ASR 备选
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T25 |
+| **优先级** | P1 |
+| **功能** | 长音频/复杂场景降级到云端 ASR API |
+| **负责** | Coder-A (Media Layer) |
+| **依赖** | T12 (本地 ASR) ✅ |
+| **工作量** | S (2 人日) |
+| **PRD 章节** | §2.2 F16, §5.2-语音流程 |
+| **AC 关联** | AC17 |
+| **创建/修改文件** | |
+| | `data/media/CloudAsrEngine.kt` — 新增云端 ASR 备选 |
+| | `data/media/VoiceRepository.kt` — 修改：降级逻辑 |
+| **描述** | 长音频（>30s）或本地识别置信度过低（<0.6）时自动降级到云端 ASR API。实现两段式策略：先试本地（低延迟），失败/低分后触发云端备选，返回后替换。 |
+
+### T26 — F18 云端 TTS + F20 语音打断协调完成
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T26 |
+| **优先级** | P1 |
+| **功能** | 长文本云端 TTS 流式播放 + 打断协调完整实现 |
+| **负责** | Coder-A (Media) + Coder-B (UI) |
+| **依赖** | T13 (TTS 基础) ✅ |
+| **工作量** | M (4 人日) |
+| **PRD 章节** | §2.2 F18, F20, §4.6-VoiceInputBar |
+| **AC 关联** | AC19, AC20 |
+| **创建/修改文件** | |
+| | `data/media/CloudTtsEngine.kt` — 新增云端 TTS 流式播放 |
+| | `data/media/VoiceRepository.kt` — 修改：打断协调逻辑完善 |
+| | `ui/screen/chat/components/VoiceInputBar.kt` — 修改：打断交互流畅化 |
+| **描述** | 长文本（>500 字）自动降级云端 TTS 流式播放，短文本使用本地引擎。TTS 播放中触发 ASR → 旧播放立即停止 → ASR 监听 → 识别后处理新请求，打断延迟 < 300ms，无杂音/爆音。点击另一消息 TTS 按钮→打断当前→播放新的。 |
+
+### T27 — F24 图片消息渲染
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T27 |
+| **优先级** | P1 |
+| **功能** | 消息气泡中显示图片缩略图，点击全屏预览 |
+| **负责** | Coder-B (UI) |
+| **依赖** | T4 (聊天界面) ✅, T8 (拍照) ✅ |
+| **工作量** | S (1 人日) |
+| **PRD 章节** | §2.2 F24, §4.4-ChatScreen |
+| **AC 关联** | AC23 |
+| **创建/修改文件** | |
+| | `ui/screen/chat/components/ImageMessage.kt` — 新增图片消息组件 |
+| | `ui/screen/chat/components/MessageBubble.kt` — 修改：图片类型分支 |
+| **描述** | 图片消息在气泡中显示缩略图（320dp 最大宽/高），点击→全屏预览（PhotoView 支持缩放）。加载中显示占位图+动画，失败显示「图片加载失败」+ 重试按钮。 |
+
+---
+
+## Phase 4C — P2 体验补齐（补全冲刺）
+
+> Sprint 3 | 第 4 周 | 预计总工时：10-13 人日 | 2 Coder 并行
+
+### T28 — F30 订阅管理后端绑定
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T28 |
+| **优先级** | P2 |
+| **功能** | 订阅状态对接后端 API，真实配额绑定 |
+| **负责** | Coder-B (UI) + Coder-A (Data) |
+| **依赖** | T20 (个人中心) ✅ |
+| **工作量** | S (2 人日) |
+| **PRD 章节** | §2.2 F30, §4.13-SubscriptionScreen |
+| **AC 关联** | AC30, AC31 |
+| **创建/修改文件** | |
+| | `ui/screen/subscription/SubscriptionScreen.kt` — 修改：绑定真实数据 |
+| | `ui/screen/subscription/SubscriptionViewModel.kt` — 修改：API 对接 |
+| | `data/repository/SubscriptionRepository.kt` — 新建/修改 |
+| **描述** | 订阅页面对接后端 `GET /api/v1/subscription/status` 真实数据。配额进度条反映实际使用量（daily_used/daily_quota），功能对比表根据订阅类型动态展示。 |
+
+### T29 — F31 清除缓存 + F32 新消息通知
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T29 |
+| **优先级** | P2 |
+| **功能** | 缓存清理 + 本地通知 |
+| **负责** | Coder-B (UI) |
+| **依赖** | T7 (Room) ✅, T17 (设置) ✅ |
+| **工作量** | M (3 人日) |
+| **PRD 章节** | §2.2 F31, F32 |
+| **AC 关联** | AC32, AC33 |
+| **创建/修改文件** | |
+| | `data/local/CacheManager.kt` — 新增缓存清理管理器 |
+| | `data/local/NotificationHelper.kt` — 新增/增强通知辅助类 |
+| | `ui/screen/settings/SettingsScreen.kt` — 修改：清除缓存 + 通知设置入口 |
+| | `AndroidManifest.xml` — 修改：通知权限声明 |
+| **描述** | 设置页新增「清除缓存」按钮+确认弹窗，清理图片缓存/非核心数据/日志。新 AI 消息到达时发送本地通知（NotificationCompat + 通知渠道），点击跳转到对应会话。 |
+
+### T30 — F46 游戏化系统
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T30 |
+| **优先级** | P2 |
+| **功能** | 成就系统 + 连胜机制 + 排行榜 |
+| **负责** | Coder-A (Engine) + Coder-B (UI) |
+| **依赖** | T14 (仪表盘) ✅ |
+| **工作量** | M (5 人日) |
+| **PRD 章节** | §2.2 F46, §9.1-F46 |
+| **AC 关联** | AC53, AC54, AC55 |
+| **创建/修改文件** | |
+| | `domain/engine/GamificationEngine.kt` — 新增成就检测引擎 |
+| | `data/local/dao/AchievementDao.kt` — 新增成就 DAO |
+| | `data/local/entity/AchievementEntity.kt` — 新增成就 Entity |
+| | `data/repository/GamificationRepository.kt` — 新增游戏化仓库 |
+| | `ui/screen/dashboard/components/AchievementBadge.kt` — 新增成就徽章组件 |
+| | `ui/screen/dashboard/components/StreakIndicator.kt` — 新增连胜指示器 |
+| | `ui/screen/dashboard/components/LeaderboardView.kt` — 新增排行榜组件 |
+| **描述** | 成就引擎：预设成就徽章（首次解题/连续7天学习/答对100题/学霸等），学习行为触发自动检测→条件满足解锁→弹窗动画。连胜自动累计中断重置。排行榜：学习积分（时长/解题数/正确率综合），支持全局/好友，每日更新。本地优先+云端同步。 |
+
+---
+
+## Phase 4D — 语音增强（可选，P2）
+
+> Sprint 4 | 第 5 周 | 预计总工时：3 人日
+
+### T31 — F47 语音交互增强
+
+| 属性 | 内容 |
+|------|------|
+| **ID** | T31 |
+| **优先级** | P2 |
+| **功能** | ASR 降噪优化 + 打断流畅度进一步提升 |
+| **负责** | Coder-A (Media) |
+| **依赖** | T12 ✅, T13 ✅ |
+| **工作量** | M (3 人日) |
+| **PRD 章节** | §2.2 F47, §9.1-F47 |
+| **AC 关联** | AC56, AC57 |
+| **创建/修改文件** | |
+| | `data/media/NoiseSuppression.kt` — 新增环境自适应降噪 |
+| | `data/media/VoiceRepository.kt` — 修改：降噪集成 |
+| | `data/media/CloudAsrEngine.kt` — 修改：噪声环境降级策略 |
+| **描述** | ASR 识别率优化：噪声环境自动降级到云端 ASR + 环境自适应降噪。打断延迟持续 < 300ms，识别率在 60dB 噪声环境下提升 ≥15%。 |
+
+---
+
+## 更新后任务依赖全景图
+
+```
+T1 脚手架 ──────┬── T2 认证 ─── T20 个人中心 ─── T28 订阅绑定
+                ├── T3 会话管理 ─── T4 聊天界面 ─── T27 图片消息
+                │                   ├── T5 SSE 流式 ─── T22 拍照增强SSE
+                │                   │                └── T23 自适应讲解
+                │                   │                └── T24 苏格拉底式
+                │                   ├── T6 Markdown渲染
+                │                   └── T7 持久化 ─── T29 缓存+通知
+                ├── T8 拍照基础 ─── T9 拍照增强
+                │                └── T22 全学科SSE
+                ├── T10 自适应讲解 (→ T23 改为独立Sprint)
+                ├── T11 苏格拉底式 (→ T24 改为独立Sprint)
+                ├── T12 ASR ─── T13 TTS+打断 ─── T25 云端ASR
+                │                              ├── T26 TTS+打断完善
+                │                              └── T31 语音增强(可选)
+                └── T14 仪表盘 ─── T15 测验 ─── T16 间隔重复
+                                  └── T18 游戏化 (→ T30)
+
+新任务标记: T22-T31
+```
+
+**任务启动条件：** 所有依赖（"依赖"列）为 ✅ 即可启动。
+**并行策略：** T22/T23/T24 无互依赖可 3 路并行；T25/T26/T27 可并行；T28/T29/T30 可并行。
+
+---
+
+## 更新后排期总览
 
 | 阶段 | 时间 | 任务 | 预估人日 |
 |------|------|------|:--------:|
-| **Phase 1S** | 第 1 周 | T1 脚手架 + T2 认证 | 6-8 |
-| **Phase 1A** | 第 1-2 周 | T3 会话 + T4 聊天 + T5 流式 + T6 渲染 + T7 持久化 | 12-16 |
-| **Phase 1B** | 第 2-3 周 | T8 拍照基础 + T9 拍照增强 | 7-10 |
-| **Phase 1C** | 第 2-3 周 | T10 自适应讲解 + T11 苏格拉底式教学 | 7-9 |
-| **Phase 2A** | 第 3-4 周 | T12 ASR + T13 TTS+打断 | 8-10 |
-| **Phase 2B** | 第 3-4 周 | T14 学习仪表盘 | 6-8 |
-| **Phase 2C** | 第 4-5 周 | T15 测验 + T16 间隔重复 | 9-13 |
-| **Phase 2D** | 第 4 周 | T17 设置 | 3-4 |
-| **Phase 3A** | 第 5 周 | T18 游戏化 | 4-6 |
-| **Phase 3B** | 第 5-6 周 | T19 语音增强 + T20 个人中心 | 5-7 |
-| **Phase 3C** | 第 6 周 | T21 UX 完善 | 2-3 |
-| **总计** | **6 周** | **21 个子任务** | **69-94 人日** |
+| **Phase 1S** | 第 1 周 | T1 + T2 | 6-8 |
+| **Phase 1A** | 第 1-2 周 | T3 + T4 + T5 + T6 + T7 | 12-16 |
+| **Phase 1B** | 第 2-3 周 | T8 + T9 | 7-10 |
+| **Phase 1C** | 第 2-3 周 | T10 + T11 | 7-9 |
+| **Phase 2A** | 第 3-4 周 | T12 + T13 | 8-10 |
+| **Phase 2B** | 第 3-4 周 | T14 | 6-8 |
+| **Phase 2C** | 第 4-5 周 | T15 + T16 | 9-13 |
+| **Phase 2D** | 第 4 周 | T17 | 3-4 |
+| **Phase 3A** | 第 5 周 | T18 | 4-6 |
+| **Phase 3B** | 第 5-6 周 | T19 + T20 | 5-7 |
+| **Phase 3C** | 第 6 周 | T21 | 2-3 |
+| **— 原始总计 —** | **— 6 周 —** | **— T1-T21 —** | **— 69-94 人日 —** |
+| **Phase 4A** (补全) | 第 1-2 周 | T22 + T23 + T24 | 12-16 |
+| **Phase 4B** (补全) | 第 3 周 | T25 + T26 + T27 | 7-9 |
+| **Phase 4C** (补全) | 第 4 周 | T28 + T29 + T30 | 10-13 |
+| **Phase 4D** (可选) | 第 5 周 | T31 | 3 |
+| **总计** | **约 4-5 周（追加）** | **31 个子任务（T1-T31）** | **101-135 人日** |
 
-> **注：** 以上估时为 Android 前端开发工时，后端 API 对应工作量需后端团队另行估算。
-> 测试、Code Review、Bug Fix 工时未计入。
-> 建议配置 2 名 Coder（Coder-A: Data/Network/Media 层，Coder-B: UI/Compose 层）并行开发。
+> **注：** Phase 4A/B/C/D 为补全冲刺阶段，可与原始 Phase 2-3 并行推进。
+> 建议配置 2 名 Coder（Coder-A: Data/Network/Media；Coder-B: UI/Compose）。
+> 测试、Code Review、Bug Fix 工时未计入。完成 T22-T30 后总完成率可达 95.5%。

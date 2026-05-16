@@ -1,7 +1,9 @@
 package com.aitutor.app.ui.chat
 
 import com.aitutor.app.domain.model.ChatMessage
+import com.aitutor.app.domain.model.ChatMode
 import com.aitutor.app.domain.model.Conversation
+import com.aitutor.app.domain.model.TeachingState
 import com.aitutor.app.domain.model.VoiceState
 
 data class ChatUiState(
@@ -16,7 +18,16 @@ data class ChatUiState(
     val voiceState: VoiceState = VoiceState(),
     val showConversationSheet: Boolean = false,
     val searchKeyword: String = "",
-    // Feature 2 & 3: Adaptive teaching & mode toggle
+    // Feature 2 (F41): Adaptive teaching & grade awareness
     val tutorMode: Boolean = false,
-    val userGrade: String? = null
+    val userGrade: String? = null,
+    // Feature 2 (F41): Self-adaptive step-by-step difficulty
+    val difficultyLevel: String = "auto",  // "auto", "小学", "初中", "高中", "大学"
+    // Feature 3 (F42): Socratic teaching mode
+    val chatMode: ChatMode = ChatMode.ASSISTANT,
+    val teachingState: TeachingState = TeachingState.Idle,
+    // Timestamp for idle timeout auto-exit (F42: 30 min)
+    val tutorModeLastActiveTime: Long = System.currentTimeMillis(),
+    // Whether the difficulty switcher is visible
+    val showDifficultySwitcher: Boolean = false
 )

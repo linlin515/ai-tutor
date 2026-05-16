@@ -3,7 +3,10 @@ package com.aitutor.app.di
 import com.aitutor.app.data.remote.api.AiTutorApi
 import com.aitutor.app.data.remote.api.AnalyticsApi
 import com.aitutor.app.data.remote.api.ChatStreamApi
+import com.aitutor.app.data.remote.api.GamificationApi
 import com.aitutor.app.data.remote.api.QuizApi
+import com.aitutor.app.data.remote.api.SolveApi
+import com.aitutor.app.data.remote.api.SubscriptionApi
 import com.aitutor.app.data.remote.interceptor.AuthInterceptor
 import com.aitutor.app.data.remote.interceptor.TokenManager
 import com.aitutor.app.domain.repository.AuthRepository
@@ -89,5 +92,23 @@ object NetworkModule {
     @Singleton
     fun provideQuizApi(retrofit: Retrofit): QuizApi {
         return retrofit.create(QuizApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSolveApi(okHttpClient: OkHttpClient): SolveApi {
+        return SolveApi(okHttpClient, BASE_URL)
+    }
+
+    @Provides
+    @Singleton
+    fun provideGamificationApi(retrofit: Retrofit): GamificationApi {
+        return retrofit.create(GamificationApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSubscriptionApi(retrofit: Retrofit): SubscriptionApi {
+        return retrofit.create(SubscriptionApi::class.java)
     }
 }

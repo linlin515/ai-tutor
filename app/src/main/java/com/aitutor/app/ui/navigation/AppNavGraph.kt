@@ -35,6 +35,8 @@ import com.aitutor.app.ui.splash.SplashScreen
 import com.aitutor.app.ui.screen.dashboard.DashboardScreen
 import com.aitutor.app.ui.screen.quiz.QuizScreen
 import com.aitutor.app.ui.screen.review.ReviewScreen
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 data class BottomNavItem(
     val label: String,
@@ -44,10 +46,23 @@ data class BottomNavItem(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(
+    pendingConversationId: StateFlow<Long> = MutableStateFlow(-1L)
+) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
+
+    // Handle notification click — navigate to specific conversation
+    val pendingConvId by pendingConversationId.collectAsState()
+    LaunchedEffect(pendingConvId) {
+        if (pendingConvId > 0) {
+            navController.navigate(Routes.chatConversation(pendingConvId)) {
+                popUpTo(0) { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+    }
 
     val bottomNavItems = listOf(
         BottomNavItem("对话", Icons.Default.Chat, Routes.CHAT),
