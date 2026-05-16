@@ -71,11 +71,3 @@ data class SolvePhotoResponse(
     @SerializedName("subject") val subject: String?,
     @SerializedName("tokens_used") val tokensUsed: Int?
 )
-
-data class SubscriptionStatusDto(
-    @SerializedName("is_subscribed") val isSubscribed: Boolean,
-    @SerializedName("plan") val plan: String,
-    @SerializedName("expire_date") val expireDate: String?,
-    @SerializedName("daily_quota") val dailyQuota: Int,
-    @SerializedName("features") val features: List<String>
-)

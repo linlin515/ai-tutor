@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-36:12
-INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-36:12
-INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-36:12
-INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-36:12
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-37:12
+INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-37:12
+INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-37:12
+INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:2:1-37:12
 MERGED from [androidx.camera:camera-video:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/f03d4e52b38ae0e76c9d110459145dcf/transformed/camera-video-1.3.1/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.camera:camera-view:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/780c69081bbf41578109374176a0f574/transformed/camera-view-1.3.1/AndroidManifest.xml:2:1-7:12
 MERGED from [androidx.camera:camera-lifecycle:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/c8cd33278cdeaad480b838ae4ea16e3c/transformed/camera-lifecycle-1.3.1/AndroidManifest.xml:2:1-7:12
@@ -145,21 +145,25 @@ MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/lin
 MERGED from [com.google.android.datatransport:transport-runtime:2.2.6] /home/linruihang0517/.gradle/caches/transforms-3/c1097579b56e23913b886f00c37c461b/transformed/transport-runtime-2.2.6/AndroidManifest.xml:22:5-79
 	android:name
 		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:10:22-76
+uses-permission#android.permission.POST_NOTIFICATIONS
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:11:5-77
+	android:name
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:11:22-74
 uses-feature#android.hardware.camera
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:12:5-85
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:5-85
 	android:required
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:12:58-82
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:58-82
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:12:19-57
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:19-57
 uses-feature#android.hardware.microphone
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:5-89
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:14:5-89
 	android:required
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:62-86
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:14:62-86
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:13:19-61
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:14:19-61
 application
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:15:5-34:19
-INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:15:5-34:19
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:16:5-35:19
+INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:16:5-35:19
 MERGED from [androidx.camera:camera-camera2:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/c8fa476fe920dd6f27bc272c0c977052/transformed/camera-camera2-1.3.1/AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-camera2:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/c8fa476fe920dd6f27bc272c0c977052/transformed/camera-camera2-1.3.1/AndroidManifest.xml:23:5-34:19
 MERGED from [androidx.camera:camera-core:1.3.1] /home/linruihang0517/.gradle/caches/transforms-3/cade4fe553c7d9bdee736903374f97e2/transformed/camera-core-1.3.1/AndroidManifest.xml:23:5-34:19
@@ -205,39 +209,39 @@ MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/linruihang0517/.gr
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.12.0] /home/linruihang0517/.gradle/caches/transforms-3/b766c5c7bdec3185ac96fc76197a7ef8/transformed/core-1.12.0/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:20:9-35
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:21:9-35
 	android:label
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:19:9-41
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:20:9-41
 	tools:targetApi
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:23:9-29
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:24:9-29
 	android:icon
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:18:9-43
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:19:9-43
 	android:allowBackup
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:17:9-35
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:18:9-35
 	android:theme
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:21:9-45
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:22:9-45
 	android:networkSecurityConfig
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:22:9-69
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:23:9-69
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:16:9-35
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:17:9-35
 activity#com.aitutor.app.MainActivity
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:25:9-33:20
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:26:9-34:20
 	android:exported
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:27:13-36
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:28:13-36
 	android:theme
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:28:13-49
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:29:13-49
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:26:13-41
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:27:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:29:13-32:29
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:30:13-33:29
 action#android.intent.action.MAIN
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:30:17-69
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:31:17-69
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:30:25-66
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:31:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:31:17-77
+ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:32:17-77
 	android:name
-		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:31:27-74
+		ADDED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml:32:27-74
 uses-sdk
 INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /home/linruihang0517/hermes/projects/ai-tutor-android/app/src/main/AndroidManifest.xml

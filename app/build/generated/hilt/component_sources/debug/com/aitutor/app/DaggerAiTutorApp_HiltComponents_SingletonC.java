@@ -8,46 +8,71 @@ import android.view.View;
 import androidx.fragment.app.Fragment;
 import androidx.lifecycle.SavedStateHandle;
 import androidx.lifecycle.ViewModel;
+import com.aitutor.app.data.local.CacheManager;
+import com.aitutor.app.data.local.dao.AchievementDao;
 import com.aitutor.app.data.local.dao.AnalyticsDao;
 import com.aitutor.app.data.local.dao.ConversationDao;
 import com.aitutor.app.data.local.dao.MessageDao;
 import com.aitutor.app.data.local.dao.PendingSubmissionDao;
 import com.aitutor.app.data.local.dao.QuizRecordDao;
+import com.aitutor.app.data.local.dao.ScoreLogDao;
+import com.aitutor.app.data.local.dao.SubscriptionCacheDao;
+import com.aitutor.app.data.local.dao.UserScoreDao;
 import com.aitutor.app.data.local.dao.WrongAnswerDao;
 import com.aitutor.app.data.local.db.AiTutorDatabase;
+import com.aitutor.app.data.media.CloudAsrEngine;
+import com.aitutor.app.data.media.CloudTtsEngine;
+import com.aitutor.app.data.media.TtsAudioPlayer;
 import com.aitutor.app.data.remote.api.AiTutorApi;
 import com.aitutor.app.data.remote.api.AnalyticsApi;
 import com.aitutor.app.data.remote.api.ChatStreamApi;
+import com.aitutor.app.data.remote.api.GamificationApi;
 import com.aitutor.app.data.remote.api.QuizApi;
+import com.aitutor.app.data.remote.api.SolveApi;
+import com.aitutor.app.data.remote.api.SubscriptionApi;
 import com.aitutor.app.data.remote.datastore.SettingsDataStore;
 import com.aitutor.app.data.remote.interceptor.AuthInterceptor;
 import com.aitutor.app.data.remote.interceptor.TokenManager;
 import com.aitutor.app.data.repository.AnalyticsRepositoryImpl;
 import com.aitutor.app.data.repository.AuthRepositoryImpl;
 import com.aitutor.app.data.repository.ChatRepositoryImpl;
+import com.aitutor.app.data.repository.GamificationRepositoryImpl;
 import com.aitutor.app.data.repository.QuizRepositoryImpl;
 import com.aitutor.app.data.repository.SettingsRepositoryImpl;
+import com.aitutor.app.data.repository.SolveRepositoryImpl;
+import com.aitutor.app.data.repository.SubscriptionRepositoryImpl;
+import com.aitutor.app.data.repository.UserProfileRepository;
 import com.aitutor.app.data.repository.VoiceRepositoryImpl;
 import com.aitutor.app.data.repository.WrongAnswerRepositoryImpl;
+import com.aitutor.app.di.DatabaseModule_ProvideAchievementDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideAnalyticsDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideConversationDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideDatabaseFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideMessageDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvidePendingSubmissionDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideQuizRecordDaoFactory;
+import com.aitutor.app.di.DatabaseModule_ProvideScoreLogDaoFactory;
+import com.aitutor.app.di.DatabaseModule_ProvideSubscriptionCacheDaoFactory;
+import com.aitutor.app.di.DatabaseModule_ProvideUserScoreDaoFactory;
 import com.aitutor.app.di.DatabaseModule_ProvideWrongAnswerDaoFactory;
+import com.aitutor.app.di.GsonModule_ProvideGsonFactory;
 import com.aitutor.app.di.NetworkModule_ProvideAiTutorApiFactory;
 import com.aitutor.app.di.NetworkModule_ProvideAnalyticsApiFactory;
 import com.aitutor.app.di.NetworkModule_ProvideAuthInterceptorFactory;
 import com.aitutor.app.di.NetworkModule_ProvideChatStreamApiFactory;
+import com.aitutor.app.di.NetworkModule_ProvideGamificationApiFactory;
 import com.aitutor.app.di.NetworkModule_ProvideLoggingInterceptorFactory;
 import com.aitutor.app.di.NetworkModule_ProvideOkHttpClientFactory;
 import com.aitutor.app.di.NetworkModule_ProvideQuizApiFactory;
 import com.aitutor.app.di.NetworkModule_ProvideRetrofitFactory;
+import com.aitutor.app.di.NetworkModule_ProvideSolveApiFactory;
+import com.aitutor.app.di.NetworkModule_ProvideSubscriptionApiFactory;
 import com.aitutor.app.di.SpeechModule_ProvideSpeechRecognizerFactory;
 import com.aitutor.app.di.SpeechModule_ProvideTextToSpeechFactory;
+import com.aitutor.app.domain.engine.GamificationEngine;
 import com.aitutor.app.domain.engine.SpacedRepetitionEngine;
 import com.aitutor.app.domain.repository.AuthRepository;
+import com.aitutor.app.domain.usecase.chat.ProcessTeachingResponseUseCase;
 import com.aitutor.app.domain.usecase.quiz.GenerateQuizUseCase;
 import com.aitutor.app.domain.usecase.quiz.SubmitQuizUseCase;
 import com.aitutor.app.ui.auth.LoginViewModel;
@@ -66,10 +91,13 @@ import com.aitutor.app.ui.screen.quiz.QuizViewModel;
 import com.aitutor.app.ui.screen.quiz.QuizViewModel_HiltModules_KeyModule_ProvideFactory;
 import com.aitutor.app.ui.screen.review.ReviewViewModel;
 import com.aitutor.app.ui.screen.review.ReviewViewModel_HiltModules_KeyModule_ProvideFactory;
+import com.aitutor.app.ui.screen.subscription.SubscriptionViewModel;
+import com.aitutor.app.ui.screen.subscription.SubscriptionViewModel_HiltModules_KeyModule_ProvideFactory;
 import com.aitutor.app.ui.settings.SettingsViewModel;
 import com.aitutor.app.ui.settings.SettingsViewModel_HiltModules_KeyModule_ProvideFactory;
 import com.aitutor.app.ui.splash.SplashViewModel;
 import com.aitutor.app.ui.splash.SplashViewModel_HiltModules_KeyModule_ProvideFactory;
+import com.google.gson.Gson;
 import dagger.hilt.android.ActivityRetainedLifecycle;
 import dagger.hilt.android.ViewModelLifecycle;
 import dagger.hilt.android.internal.builders.ActivityComponentBuilder;
@@ -431,7 +459,7 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
 
     @Override
     public Set<String> getViewModelKeys() {
-      return SetBuilder.<String>newSetBuilder(10).add(CameraViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ChatViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ConversationViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(DashboardViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(LoginViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ProfileViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(QuizViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ReviewViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(SettingsViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(SplashViewModel_HiltModules_KeyModule_ProvideFactory.provide()).build();
+      return SetBuilder.<String>newSetBuilder(11).add(CameraViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ChatViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ConversationViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(DashboardViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(LoginViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ProfileViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(QuizViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(ReviewViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(SettingsViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(SplashViewModel_HiltModules_KeyModule_ProvideFactory.provide()).add(SubscriptionViewModel_HiltModules_KeyModule_ProvideFactory.provide()).build();
     }
 
     @Override
@@ -477,6 +505,8 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
 
     private Provider<SplashViewModel> splashViewModelProvider;
 
+    private Provider<SubscriptionViewModel> subscriptionViewModelProvider;
+
     private ViewModelCImpl(SingletonCImpl singletonCImpl,
         ActivityRetainedCImpl activityRetainedCImpl, SavedStateHandle savedStateHandleParam,
         ViewModelLifecycle viewModelLifecycleParam) {
@@ -485,6 +515,10 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
 
       initialize(savedStateHandleParam, viewModelLifecycleParam);
 
+    }
+
+    private ProcessTeachingResponseUseCase processTeachingResponseUseCase() {
+      return new ProcessTeachingResponseUseCase(singletonCImpl.chatRepositoryImplProvider.get());
     }
 
     private GenerateQuizUseCase generateQuizUseCase() {
@@ -508,11 +542,12 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
       this.reviewViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 7);
       this.settingsViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 8);
       this.splashViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 9);
+      this.subscriptionViewModelProvider = new SwitchingProvider<>(singletonCImpl, activityRetainedCImpl, viewModelCImpl, 10);
     }
 
     @Override
     public Map<String, javax.inject.Provider<ViewModel>> getHiltViewModelMap() {
-      return MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(10).put("com.aitutor.app.ui.camera.CameraViewModel", ((Provider) cameraViewModelProvider)).put("com.aitutor.app.ui.chat.ChatViewModel", ((Provider) chatViewModelProvider)).put("com.aitutor.app.ui.conversation.ConversationViewModel", ((Provider) conversationViewModelProvider)).put("com.aitutor.app.ui.screen.dashboard.DashboardViewModel", ((Provider) dashboardViewModelProvider)).put("com.aitutor.app.ui.auth.LoginViewModel", ((Provider) loginViewModelProvider)).put("com.aitutor.app.ui.profile.ProfileViewModel", ((Provider) profileViewModelProvider)).put("com.aitutor.app.ui.screen.quiz.QuizViewModel", ((Provider) quizViewModelProvider)).put("com.aitutor.app.ui.screen.review.ReviewViewModel", ((Provider) reviewViewModelProvider)).put("com.aitutor.app.ui.settings.SettingsViewModel", ((Provider) settingsViewModelProvider)).put("com.aitutor.app.ui.splash.SplashViewModel", ((Provider) splashViewModelProvider)).build();
+      return MapBuilder.<String, javax.inject.Provider<ViewModel>>newMapBuilder(11).put("com.aitutor.app.ui.camera.CameraViewModel", ((Provider) cameraViewModelProvider)).put("com.aitutor.app.ui.chat.ChatViewModel", ((Provider) chatViewModelProvider)).put("com.aitutor.app.ui.conversation.ConversationViewModel", ((Provider) conversationViewModelProvider)).put("com.aitutor.app.ui.screen.dashboard.DashboardViewModel", ((Provider) dashboardViewModelProvider)).put("com.aitutor.app.ui.auth.LoginViewModel", ((Provider) loginViewModelProvider)).put("com.aitutor.app.ui.profile.ProfileViewModel", ((Provider) profileViewModelProvider)).put("com.aitutor.app.ui.screen.quiz.QuizViewModel", ((Provider) quizViewModelProvider)).put("com.aitutor.app.ui.screen.review.ReviewViewModel", ((Provider) reviewViewModelProvider)).put("com.aitutor.app.ui.settings.SettingsViewModel", ((Provider) settingsViewModelProvider)).put("com.aitutor.app.ui.splash.SplashViewModel", ((Provider) splashViewModelProvider)).put("com.aitutor.app.ui.screen.subscription.SubscriptionViewModel", ((Provider) subscriptionViewModelProvider)).build();
     }
 
     @Override
@@ -542,16 +577,16 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
       public T get() {
         switch (id) {
           case 0: // com.aitutor.app.ui.camera.CameraViewModel 
-          return (T) new CameraViewModel(singletonCImpl.chatRepositoryImplProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+          return (T) new CameraViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.solveRepositoryImplProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 1: // com.aitutor.app.ui.chat.ChatViewModel 
-          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.voiceRepositoryImplProvider.get(), singletonCImpl.settingsRepositoryImplProvider.get(), (AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get());
+          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.voiceRepositoryImplProvider.get(), singletonCImpl.settingsRepositoryImplProvider.get(), (AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get(), singletonCImpl.userProfileRepositoryProvider.get(), viewModelCImpl.processTeachingResponseUseCase(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 2: // com.aitutor.app.ui.conversation.ConversationViewModel 
           return (T) new ConversationViewModel(singletonCImpl.chatRepositoryImplProvider.get());
 
           case 3: // com.aitutor.app.ui.screen.dashboard.DashboardViewModel 
-          return (T) new DashboardViewModel(singletonCImpl.analyticsRepositoryImplProvider.get());
+          return (T) new DashboardViewModel(singletonCImpl.analyticsRepositoryImplProvider.get(), singletonCImpl.gamificationRepositoryImplProvider.get());
 
           case 4: // com.aitutor.app.ui.auth.LoginViewModel 
           return (T) new LoginViewModel((AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get());
@@ -566,10 +601,13 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
           return (T) new ReviewViewModel(singletonCImpl.wrongAnswerRepositoryImplProvider.get());
 
           case 8: // com.aitutor.app.ui.settings.SettingsViewModel 
-          return (T) new SettingsViewModel(singletonCImpl.settingsRepositoryImplProvider.get());
+          return (T) new SettingsViewModel(singletonCImpl.settingsRepositoryImplProvider.get(), singletonCImpl.cacheManagerProvider.get());
 
           case 9: // com.aitutor.app.ui.splash.SplashViewModel 
           return (T) new SplashViewModel(singletonCImpl.tokenManagerProvider.get());
+
+          case 10: // com.aitutor.app.ui.screen.subscription.SubscriptionViewModel 
+          return (T) new SubscriptionViewModel(singletonCImpl.subscriptionRepositoryImplProvider.get());
 
           default: throw new AssertionError(id);
         }
@@ -671,9 +709,19 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
 
     private Provider<ChatRepositoryImpl> chatRepositoryImplProvider;
 
+    private Provider<SolveApi> provideSolveApiProvider;
+
+    private Provider<SolveRepositoryImpl> solveRepositoryImplProvider;
+
     private Provider<SpeechRecognizer> provideSpeechRecognizerProvider;
 
     private Provider<TextToSpeech> provideTextToSpeechProvider;
+
+    private Provider<CloudAsrEngine> cloudAsrEngineProvider;
+
+    private Provider<CloudTtsEngine> cloudTtsEngineProvider;
+
+    private Provider<TtsAudioPlayer> ttsAudioPlayerProvider;
 
     private Provider<VoiceRepositoryImpl> voiceRepositoryImplProvider;
 
@@ -681,11 +729,25 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
 
     private Provider<SettingsRepositoryImpl> settingsRepositoryImplProvider;
 
+    private Provider<UserProfileRepository> userProfileRepositoryProvider;
+
     private Provider<AnalyticsDao> provideAnalyticsDaoProvider;
 
     private Provider<AnalyticsApi> provideAnalyticsApiProvider;
 
     private Provider<AnalyticsRepositoryImpl> analyticsRepositoryImplProvider;
+
+    private Provider<AchievementDao> provideAchievementDaoProvider;
+
+    private Provider<UserScoreDao> provideUserScoreDaoProvider;
+
+    private Provider<ScoreLogDao> provideScoreLogDaoProvider;
+
+    private Provider<GamificationEngine> gamificationEngineProvider;
+
+    private Provider<GamificationApi> provideGamificationApiProvider;
+
+    private Provider<GamificationRepositoryImpl> gamificationRepositoryImplProvider;
 
     private Provider<QuizApi> provideQuizApiProvider;
 
@@ -698,6 +760,16 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
     private Provider<WrongAnswerDao> provideWrongAnswerDaoProvider;
 
     private Provider<WrongAnswerRepositoryImpl> wrongAnswerRepositoryImplProvider;
+
+    private Provider<CacheManager> cacheManagerProvider;
+
+    private Provider<SubscriptionApi> provideSubscriptionApiProvider;
+
+    private Provider<SubscriptionCacheDao> provideSubscriptionCacheDaoProvider;
+
+    private Provider<Gson> provideGsonProvider;
+
+    private Provider<SubscriptionRepositoryImpl> subscriptionRepositoryImplProvider;
 
     private SingletonCImpl(ApplicationContextModule applicationContextModuleParam) {
       this.applicationContextModule = applicationContextModuleParam;
@@ -726,20 +798,37 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
       DelegateFactory.setDelegate(provideOkHttpClientProvider, DoubleCheck.provider(new SwitchingProvider<OkHttpClient>(singletonCImpl, 3)));
       this.provideChatStreamApiProvider = DoubleCheck.provider(new SwitchingProvider<ChatStreamApi>(singletonCImpl, 2));
       this.chatRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<ChatRepositoryImpl>(singletonCImpl, 0));
-      this.provideSpeechRecognizerProvider = DoubleCheck.provider(new SwitchingProvider<SpeechRecognizer>(singletonCImpl, 11));
-      this.provideTextToSpeechProvider = DoubleCheck.provider(new SwitchingProvider<TextToSpeech>(singletonCImpl, 12));
-      this.voiceRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<VoiceRepositoryImpl>(singletonCImpl, 10));
-      this.settingsDataStoreProvider = DoubleCheck.provider(new SwitchingProvider<SettingsDataStore>(singletonCImpl, 14));
-      this.settingsRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<SettingsRepositoryImpl>(singletonCImpl, 13));
-      this.provideAnalyticsDaoProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsDao>(singletonCImpl, 16));
-      this.provideAnalyticsApiProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsApi>(singletonCImpl, 17));
-      this.analyticsRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsRepositoryImpl>(singletonCImpl, 15));
-      this.provideQuizApiProvider = DoubleCheck.provider(new SwitchingProvider<QuizApi>(singletonCImpl, 19));
-      this.provideQuizRecordDaoProvider = DoubleCheck.provider(new SwitchingProvider<QuizRecordDao>(singletonCImpl, 20));
-      this.providePendingSubmissionDaoProvider = DoubleCheck.provider(new SwitchingProvider<PendingSubmissionDao>(singletonCImpl, 21));
-      this.quizRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<QuizRepositoryImpl>(singletonCImpl, 18));
-      this.provideWrongAnswerDaoProvider = DoubleCheck.provider(new SwitchingProvider<WrongAnswerDao>(singletonCImpl, 23));
-      this.wrongAnswerRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<WrongAnswerRepositoryImpl>(singletonCImpl, 22));
+      this.provideSolveApiProvider = DoubleCheck.provider(new SwitchingProvider<SolveApi>(singletonCImpl, 11));
+      this.solveRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<SolveRepositoryImpl>(singletonCImpl, 10));
+      this.provideSpeechRecognizerProvider = DoubleCheck.provider(new SwitchingProvider<SpeechRecognizer>(singletonCImpl, 13));
+      this.provideTextToSpeechProvider = DoubleCheck.provider(new SwitchingProvider<TextToSpeech>(singletonCImpl, 14));
+      this.cloudAsrEngineProvider = DoubleCheck.provider(new SwitchingProvider<CloudAsrEngine>(singletonCImpl, 15));
+      this.cloudTtsEngineProvider = DoubleCheck.provider(new SwitchingProvider<CloudTtsEngine>(singletonCImpl, 16));
+      this.ttsAudioPlayerProvider = DoubleCheck.provider(new SwitchingProvider<TtsAudioPlayer>(singletonCImpl, 17));
+      this.voiceRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<VoiceRepositoryImpl>(singletonCImpl, 12));
+      this.settingsDataStoreProvider = DoubleCheck.provider(new SwitchingProvider<SettingsDataStore>(singletonCImpl, 19));
+      this.settingsRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<SettingsRepositoryImpl>(singletonCImpl, 18));
+      this.userProfileRepositoryProvider = DoubleCheck.provider(new SwitchingProvider<UserProfileRepository>(singletonCImpl, 20));
+      this.provideAnalyticsDaoProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsDao>(singletonCImpl, 22));
+      this.provideAnalyticsApiProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsApi>(singletonCImpl, 23));
+      this.analyticsRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<AnalyticsRepositoryImpl>(singletonCImpl, 21));
+      this.provideAchievementDaoProvider = DoubleCheck.provider(new SwitchingProvider<AchievementDao>(singletonCImpl, 26));
+      this.provideUserScoreDaoProvider = DoubleCheck.provider(new SwitchingProvider<UserScoreDao>(singletonCImpl, 27));
+      this.provideScoreLogDaoProvider = DoubleCheck.provider(new SwitchingProvider<ScoreLogDao>(singletonCImpl, 28));
+      this.gamificationEngineProvider = DoubleCheck.provider(new SwitchingProvider<GamificationEngine>(singletonCImpl, 25));
+      this.provideGamificationApiProvider = DoubleCheck.provider(new SwitchingProvider<GamificationApi>(singletonCImpl, 29));
+      this.gamificationRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<GamificationRepositoryImpl>(singletonCImpl, 24));
+      this.provideQuizApiProvider = DoubleCheck.provider(new SwitchingProvider<QuizApi>(singletonCImpl, 31));
+      this.provideQuizRecordDaoProvider = DoubleCheck.provider(new SwitchingProvider<QuizRecordDao>(singletonCImpl, 32));
+      this.providePendingSubmissionDaoProvider = DoubleCheck.provider(new SwitchingProvider<PendingSubmissionDao>(singletonCImpl, 33));
+      this.quizRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<QuizRepositoryImpl>(singletonCImpl, 30));
+      this.provideWrongAnswerDaoProvider = DoubleCheck.provider(new SwitchingProvider<WrongAnswerDao>(singletonCImpl, 35));
+      this.wrongAnswerRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<WrongAnswerRepositoryImpl>(singletonCImpl, 34));
+      this.cacheManagerProvider = DoubleCheck.provider(new SwitchingProvider<CacheManager>(singletonCImpl, 36));
+      this.provideSubscriptionApiProvider = DoubleCheck.provider(new SwitchingProvider<SubscriptionApi>(singletonCImpl, 38));
+      this.provideSubscriptionCacheDaoProvider = DoubleCheck.provider(new SwitchingProvider<SubscriptionCacheDao>(singletonCImpl, 39));
+      this.provideGsonProvider = DoubleCheck.provider(new SwitchingProvider<Gson>(singletonCImpl, 40));
+      this.subscriptionRepositoryImplProvider = DoubleCheck.provider(new SwitchingProvider<SubscriptionRepositoryImpl>(singletonCImpl, 37));
     }
 
     @Override
@@ -805,47 +894,98 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
           case 9: // okhttp3.logging.HttpLoggingInterceptor 
           return (T) NetworkModule_ProvideLoggingInterceptorFactory.provideLoggingInterceptor();
 
-          case 10: // com.aitutor.app.data.repository.VoiceRepositoryImpl 
-          return (T) new VoiceRepositoryImpl(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule), singletonCImpl.provideSpeechRecognizerProvider.get(), singletonCImpl.provideTextToSpeechProvider.get());
+          case 10: // com.aitutor.app.data.repository.SolveRepositoryImpl 
+          return (T) new SolveRepositoryImpl(singletonCImpl.provideSolveApiProvider.get(), singletonCImpl.provideAiTutorApiProvider.get());
 
-          case 11: // android.speech.SpeechRecognizer 
+          case 11: // com.aitutor.app.data.remote.api.SolveApi 
+          return (T) NetworkModule_ProvideSolveApiFactory.provideSolveApi(singletonCImpl.provideOkHttpClientProvider.get());
+
+          case 12: // com.aitutor.app.data.repository.VoiceRepositoryImpl 
+          return (T) new VoiceRepositoryImpl(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule), singletonCImpl.provideSpeechRecognizerProvider.get(), singletonCImpl.provideTextToSpeechProvider.get(), singletonCImpl.cloudAsrEngineProvider.get(), singletonCImpl.cloudTtsEngineProvider.get(), singletonCImpl.ttsAudioPlayerProvider.get());
+
+          case 13: // android.speech.SpeechRecognizer 
           return (T) SpeechModule_ProvideSpeechRecognizerFactory.provideSpeechRecognizer(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
-          case 12: // android.speech.tts.TextToSpeech 
+          case 14: // android.speech.tts.TextToSpeech 
           return (T) SpeechModule_ProvideTextToSpeechFactory.provideTextToSpeech(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
-          case 13: // com.aitutor.app.data.repository.SettingsRepositoryImpl 
+          case 15: // com.aitutor.app.data.media.CloudAsrEngine 
+          return (T) new CloudAsrEngine(singletonCImpl.provideAiTutorApiProvider.get());
+
+          case 16: // com.aitutor.app.data.media.CloudTtsEngine 
+          return (T) new CloudTtsEngine(singletonCImpl.provideOkHttpClientProvider.get(), singletonCImpl.tokenManagerProvider.get());
+
+          case 17: // com.aitutor.app.data.media.TtsAudioPlayer 
+          return (T) new TtsAudioPlayer();
+
+          case 18: // com.aitutor.app.data.repository.SettingsRepositoryImpl 
           return (T) new SettingsRepositoryImpl(singletonCImpl.settingsDataStoreProvider.get());
 
-          case 14: // com.aitutor.app.data.remote.datastore.SettingsDataStore 
+          case 19: // com.aitutor.app.data.remote.datastore.SettingsDataStore 
           return (T) new SettingsDataStore(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
-          case 15: // com.aitutor.app.data.repository.AnalyticsRepositoryImpl 
+          case 20: // com.aitutor.app.data.repository.UserProfileRepository 
+          return (T) new UserProfileRepository((AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get());
+
+          case 21: // com.aitutor.app.data.repository.AnalyticsRepositoryImpl 
           return (T) new AnalyticsRepositoryImpl(singletonCImpl.provideAnalyticsDaoProvider.get(), singletonCImpl.provideAnalyticsApiProvider.get());
 
-          case 16: // com.aitutor.app.data.local.dao.AnalyticsDao 
+          case 22: // com.aitutor.app.data.local.dao.AnalyticsDao 
           return (T) DatabaseModule_ProvideAnalyticsDaoFactory.provideAnalyticsDao(singletonCImpl.provideDatabaseProvider.get());
 
-          case 17: // com.aitutor.app.data.remote.api.AnalyticsApi 
+          case 23: // com.aitutor.app.data.remote.api.AnalyticsApi 
           return (T) NetworkModule_ProvideAnalyticsApiFactory.provideAnalyticsApi(singletonCImpl.provideRetrofitProvider.get());
 
-          case 18: // com.aitutor.app.data.repository.QuizRepositoryImpl 
+          case 24: // com.aitutor.app.data.repository.GamificationRepositoryImpl 
+          return (T) new GamificationRepositoryImpl(singletonCImpl.gamificationEngineProvider.get(), singletonCImpl.provideGamificationApiProvider.get());
+
+          case 25: // com.aitutor.app.domain.engine.GamificationEngine 
+          return (T) new GamificationEngine(singletonCImpl.provideAchievementDaoProvider.get(), singletonCImpl.provideUserScoreDaoProvider.get(), singletonCImpl.provideScoreLogDaoProvider.get());
+
+          case 26: // com.aitutor.app.data.local.dao.AchievementDao 
+          return (T) DatabaseModule_ProvideAchievementDaoFactory.provideAchievementDao(singletonCImpl.provideDatabaseProvider.get());
+
+          case 27: // com.aitutor.app.data.local.dao.UserScoreDao 
+          return (T) DatabaseModule_ProvideUserScoreDaoFactory.provideUserScoreDao(singletonCImpl.provideDatabaseProvider.get());
+
+          case 28: // com.aitutor.app.data.local.dao.ScoreLogDao 
+          return (T) DatabaseModule_ProvideScoreLogDaoFactory.provideScoreLogDao(singletonCImpl.provideDatabaseProvider.get());
+
+          case 29: // com.aitutor.app.data.remote.api.GamificationApi 
+          return (T) NetworkModule_ProvideGamificationApiFactory.provideGamificationApi(singletonCImpl.provideRetrofitProvider.get());
+
+          case 30: // com.aitutor.app.data.repository.QuizRepositoryImpl 
           return (T) new QuizRepositoryImpl(singletonCImpl.provideQuizApiProvider.get(), singletonCImpl.provideQuizRecordDaoProvider.get(), singletonCImpl.providePendingSubmissionDaoProvider.get());
 
-          case 19: // com.aitutor.app.data.remote.api.QuizApi 
+          case 31: // com.aitutor.app.data.remote.api.QuizApi 
           return (T) NetworkModule_ProvideQuizApiFactory.provideQuizApi(singletonCImpl.provideRetrofitProvider.get());
 
-          case 20: // com.aitutor.app.data.local.dao.QuizRecordDao 
+          case 32: // com.aitutor.app.data.local.dao.QuizRecordDao 
           return (T) DatabaseModule_ProvideQuizRecordDaoFactory.provideQuizRecordDao(singletonCImpl.provideDatabaseProvider.get());
 
-          case 21: // com.aitutor.app.data.local.dao.PendingSubmissionDao 
+          case 33: // com.aitutor.app.data.local.dao.PendingSubmissionDao 
           return (T) DatabaseModule_ProvidePendingSubmissionDaoFactory.providePendingSubmissionDao(singletonCImpl.provideDatabaseProvider.get());
 
-          case 22: // com.aitutor.app.data.repository.WrongAnswerRepositoryImpl 
+          case 34: // com.aitutor.app.data.repository.WrongAnswerRepositoryImpl 
           return (T) new WrongAnswerRepositoryImpl(singletonCImpl.provideWrongAnswerDaoProvider.get(), new SpacedRepetitionEngine());
 
-          case 23: // com.aitutor.app.data.local.dao.WrongAnswerDao 
+          case 35: // com.aitutor.app.data.local.dao.WrongAnswerDao 
           return (T) DatabaseModule_ProvideWrongAnswerDaoFactory.provideWrongAnswerDao(singletonCImpl.provideDatabaseProvider.get());
+
+          case 36: // com.aitutor.app.data.local.CacheManager 
+          return (T) new CacheManager(ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+
+          case 37: // com.aitutor.app.data.repository.SubscriptionRepositoryImpl 
+          return (T) new SubscriptionRepositoryImpl(singletonCImpl.provideSubscriptionApiProvider.get(), singletonCImpl.provideSubscriptionCacheDaoProvider.get(), singletonCImpl.provideGsonProvider.get());
+
+          case 38: // com.aitutor.app.data.remote.api.SubscriptionApi 
+          return (T) NetworkModule_ProvideSubscriptionApiFactory.provideSubscriptionApi(singletonCImpl.provideRetrofitProvider.get());
+
+          case 39: // com.aitutor.app.data.local.dao.SubscriptionCacheDao 
+          return (T) DatabaseModule_ProvideSubscriptionCacheDaoFactory.provideSubscriptionCacheDao(singletonCImpl.provideDatabaseProvider.get());
+
+          case 40: // com.google.gson.Gson 
+          return (T) GsonModule_ProvideGsonFactory.provideGson();
 
           default: throw new AssertionError(id);
         }

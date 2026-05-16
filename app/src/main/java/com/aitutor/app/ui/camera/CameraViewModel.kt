@@ -18,6 +18,7 @@ import com.aitutor.app.domain.model.SolveEvent
 import com.aitutor.app.domain.repository.ChatRepository
 import com.aitutor.app.domain.repository.SolveRepository
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.google.mlkit.vision.text.TextRecognizer
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -70,7 +71,7 @@ class CameraViewModel @Inject constructor(
         private set
 
     /** Reusable ML Kit TextRecognizer instance (on-device). */
-    val textRecognizer: TextRecognizer = TextRecognition.getClient()
+    val textRecognizer: TextRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
     // ---- end OCR state ----
 

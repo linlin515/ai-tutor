@@ -8,6 +8,7 @@ import com.aitutor.app.data.local.dao.ConversationDao
 import com.aitutor.app.data.local.dao.MessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
+import com.aitutor.app.data.local.dao.ScoreLogDao
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao
 import com.aitutor.app.data.local.dao.UserScoreDao
 import com.aitutor.app.data.local.dao.WrongAnswerDao
@@ -81,6 +82,12 @@ object DatabaseModule {
     @Singleton
     fun provideUserScoreDao(database: AiTutorDatabase): UserScoreDao {
         return database.userScoreDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideScoreLogDao(database: AiTutorDatabase): ScoreLogDao {
+        return database.scoreLogDao()
     }
 
     @Provides

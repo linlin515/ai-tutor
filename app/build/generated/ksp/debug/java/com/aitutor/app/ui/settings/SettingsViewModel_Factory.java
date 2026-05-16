@@ -1,5 +1,6 @@
 package com.aitutor.app.ui.settings;
 
+import com.aitutor.app.data.local.CacheManager;
 import com.aitutor.app.domain.repository.SettingsRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
@@ -24,21 +25,27 @@ import javax.inject.Provider;
 public final class SettingsViewModel_Factory implements Factory<SettingsViewModel> {
   private final Provider<SettingsRepository> settingsRepositoryProvider;
 
-  public SettingsViewModel_Factory(Provider<SettingsRepository> settingsRepositoryProvider) {
+  private final Provider<CacheManager> cacheManagerProvider;
+
+  public SettingsViewModel_Factory(Provider<SettingsRepository> settingsRepositoryProvider,
+      Provider<CacheManager> cacheManagerProvider) {
     this.settingsRepositoryProvider = settingsRepositoryProvider;
+    this.cacheManagerProvider = cacheManagerProvider;
   }
 
   @Override
   public SettingsViewModel get() {
-    return newInstance(settingsRepositoryProvider.get());
+    return newInstance(settingsRepositoryProvider.get(), cacheManagerProvider.get());
   }
 
   public static SettingsViewModel_Factory create(
-      Provider<SettingsRepository> settingsRepositoryProvider) {
-    return new SettingsViewModel_Factory(settingsRepositoryProvider);
+      Provider<SettingsRepository> settingsRepositoryProvider,
+      Provider<CacheManager> cacheManagerProvider) {
+    return new SettingsViewModel_Factory(settingsRepositoryProvider, cacheManagerProvider);
   }
 
-  public static SettingsViewModel newInstance(SettingsRepository settingsRepository) {
-    return new SettingsViewModel(settingsRepository);
+  public static SettingsViewModel newInstance(SettingsRepository settingsRepository,
+      CacheManager cacheManager) {
+    return new SettingsViewModel(settingsRepository, cacheManager);
   }
 }

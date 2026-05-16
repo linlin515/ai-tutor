@@ -11,6 +11,8 @@ import androidx.room.util.DBUtil;
 import androidx.room.util.TableInfo;
 import androidx.sqlite.db.SupportSQLiteDatabase;
 import androidx.sqlite.db.SupportSQLiteOpenHelper;
+import com.aitutor.app.data.local.dao.AchievementDao;
+import com.aitutor.app.data.local.dao.AchievementDao_Impl;
 import com.aitutor.app.data.local.dao.AnalyticsDao;
 import com.aitutor.app.data.local.dao.AnalyticsDao_Impl;
 import com.aitutor.app.data.local.dao.ConversationDao;
@@ -21,6 +23,12 @@ import com.aitutor.app.data.local.dao.PendingSubmissionDao;
 import com.aitutor.app.data.local.dao.PendingSubmissionDao_Impl;
 import com.aitutor.app.data.local.dao.QuizRecordDao;
 import com.aitutor.app.data.local.dao.QuizRecordDao_Impl;
+import com.aitutor.app.data.local.dao.ScoreLogDao;
+import com.aitutor.app.data.local.dao.ScoreLogDao_Impl;
+import com.aitutor.app.data.local.dao.SubscriptionCacheDao;
+import com.aitutor.app.data.local.dao.SubscriptionCacheDao_Impl;
+import com.aitutor.app.data.local.dao.UserScoreDao;
+import com.aitutor.app.data.local.dao.UserScoreDao_Impl;
 import com.aitutor.app.data.local.dao.WrongAnswerDao;
 import com.aitutor.app.data.local.dao.WrongAnswerDao_Impl;
 import java.lang.Class;
@@ -51,10 +59,18 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
 
   private volatile WrongAnswerDao _wrongAnswerDao;
 
+  private volatile AchievementDao _achievementDao;
+
+  private volatile UserScoreDao _userScoreDao;
+
+  private volatile SubscriptionCacheDao _subscriptionCacheDao;
+
+  private volatile ScoreLogDao _scoreLogDao;
+
   @Override
   @NonNull
   protected SupportSQLiteOpenHelper createOpenHelper(@NonNull final DatabaseConfiguration config) {
-    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(2) {
+    final SupportSQLiteOpenHelper.Callback _openCallback = new RoomOpenHelper(config, new RoomOpenHelper.Delegate(3) {
       @Override
       public void createAllTables(@NonNull final SupportSQLiteDatabase db) {
         db.execSQL("CREATE TABLE IF NOT EXISTS `conversations` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `title` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `modelId` TEXT NOT NULL, `systemPrompt` TEXT, `messageCount` INTEGER NOT NULL)");
@@ -65,8 +81,12 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
         db.execSQL("CREATE TABLE IF NOT EXISTS `quiz_records` (`quizId` TEXT NOT NULL, `subject` TEXT NOT NULL, `knowledgePoints` TEXT NOT NULL, `difficulty` TEXT NOT NULL, `questionCount` INTEGER NOT NULL, `score` REAL, `durationSeconds` INTEGER, `createdAt` INTEGER NOT NULL, `syncedToCloud` INTEGER NOT NULL, PRIMARY KEY(`quizId`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `pending_submissions` (`id` TEXT NOT NULL, `quizId` TEXT NOT NULL, `answers` TEXT NOT NULL, `durationSeconds` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `retryCount` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS `wrong_answers` (`id` TEXT NOT NULL, `question` TEXT NOT NULL, `correctAnswer` TEXT NOT NULL, `userAnswer` TEXT NOT NULL, `subject` TEXT NOT NULL, `knowledgePoint` TEXT NOT NULL, `source` TEXT NOT NULL, `intervalDays` INTEGER NOT NULL, `consecutiveCorrect` INTEGER NOT NULL, `isMastered` INTEGER NOT NULL, `nextReviewAt` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `achievements` (`id` TEXT NOT NULL, `title` TEXT NOT NULL, `description` TEXT NOT NULL, `icon` TEXT NOT NULL, `conditionType` TEXT NOT NULL, `conditionValue` INTEGER NOT NULL, `status` TEXT NOT NULL, `unlockedAt` INTEGER, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `user_score` (`id` TEXT NOT NULL, `totalScore` INTEGER NOT NULL, `currentStreak` INTEGER NOT NULL, `longestStreak` INTEGER NOT NULL, `lastLearningDate` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `score_logs` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `eventType` TEXT NOT NULL, `score` INTEGER NOT NULL, `description` TEXT NOT NULL, `date` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)");
+        db.execSQL("CREATE TABLE IF NOT EXISTS `subscription_cache` (`id` INTEGER NOT NULL, `planType` TEXT NOT NULL, `status` TEXT NOT NULL, `featuresJson` TEXT NOT NULL, `dailyQuotaTotal` INTEGER NOT NULL, `dailyQuotaUsed` INTEGER NOT NULL, `validUntil` TEXT, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`))");
         db.execSQL("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)");
-        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4586993ec42af9f1dc5f63354939dbce')");
+        db.execSQL("INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '4a9a1c5226f643086feba3d8f4cbd029')");
       }
 
       @Override
@@ -78,6 +98,10 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
         db.execSQL("DROP TABLE IF EXISTS `quiz_records`");
         db.execSQL("DROP TABLE IF EXISTS `pending_submissions`");
         db.execSQL("DROP TABLE IF EXISTS `wrong_answers`");
+        db.execSQL("DROP TABLE IF EXISTS `achievements`");
+        db.execSQL("DROP TABLE IF EXISTS `user_score`");
+        db.execSQL("DROP TABLE IF EXISTS `score_logs`");
+        db.execSQL("DROP TABLE IF EXISTS `subscription_cache`");
         final List<? extends RoomDatabase.Callback> _callbacks = mCallbacks;
         if (_callbacks != null) {
           for (RoomDatabase.Callback _callback : _callbacks) {
@@ -256,9 +280,77 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
                   + " Expected:\n" + _infoWrongAnswers + "\n"
                   + " Found:\n" + _existingWrongAnswers);
         }
+        final HashMap<String, TableInfo.Column> _columnsAchievements = new HashMap<String, TableInfo.Column>(8);
+        _columnsAchievements.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("title", new TableInfo.Column("title", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("description", new TableInfo.Column("description", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("icon", new TableInfo.Column("icon", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("conditionType", new TableInfo.Column("conditionType", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("conditionValue", new TableInfo.Column("conditionValue", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("status", new TableInfo.Column("status", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsAchievements.put("unlockedAt", new TableInfo.Column("unlockedAt", "INTEGER", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysAchievements = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesAchievements = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoAchievements = new TableInfo("achievements", _columnsAchievements, _foreignKeysAchievements, _indicesAchievements);
+        final TableInfo _existingAchievements = TableInfo.read(db, "achievements");
+        if (!_infoAchievements.equals(_existingAchievements)) {
+          return new RoomOpenHelper.ValidationResult(false, "achievements(com.aitutor.app.data.local.entity.AchievementEntity).\n"
+                  + " Expected:\n" + _infoAchievements + "\n"
+                  + " Found:\n" + _existingAchievements);
+        }
+        final HashMap<String, TableInfo.Column> _columnsUserScore = new HashMap<String, TableInfo.Column>(6);
+        _columnsUserScore.put("id", new TableInfo.Column("id", "TEXT", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUserScore.put("totalScore", new TableInfo.Column("totalScore", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUserScore.put("currentStreak", new TableInfo.Column("currentStreak", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUserScore.put("longestStreak", new TableInfo.Column("longestStreak", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUserScore.put("lastLearningDate", new TableInfo.Column("lastLearningDate", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsUserScore.put("updatedAt", new TableInfo.Column("updatedAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysUserScore = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesUserScore = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoUserScore = new TableInfo("user_score", _columnsUserScore, _foreignKeysUserScore, _indicesUserScore);
+        final TableInfo _existingUserScore = TableInfo.read(db, "user_score");
+        if (!_infoUserScore.equals(_existingUserScore)) {
+          return new RoomOpenHelper.ValidationResult(false, "user_score(com.aitutor.app.data.local.entity.UserScoreEntity).\n"
+                  + " Expected:\n" + _infoUserScore + "\n"
+                  + " Found:\n" + _existingUserScore);
+        }
+        final HashMap<String, TableInfo.Column> _columnsScoreLogs = new HashMap<String, TableInfo.Column>(6);
+        _columnsScoreLogs.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsScoreLogs.put("eventType", new TableInfo.Column("eventType", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsScoreLogs.put("score", new TableInfo.Column("score", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsScoreLogs.put("description", new TableInfo.Column("description", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsScoreLogs.put("date", new TableInfo.Column("date", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsScoreLogs.put("createdAt", new TableInfo.Column("createdAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysScoreLogs = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesScoreLogs = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoScoreLogs = new TableInfo("score_logs", _columnsScoreLogs, _foreignKeysScoreLogs, _indicesScoreLogs);
+        final TableInfo _existingScoreLogs = TableInfo.read(db, "score_logs");
+        if (!_infoScoreLogs.equals(_existingScoreLogs)) {
+          return new RoomOpenHelper.ValidationResult(false, "score_logs(com.aitutor.app.data.local.entity.ScoreLogEntity).\n"
+                  + " Expected:\n" + _infoScoreLogs + "\n"
+                  + " Found:\n" + _existingScoreLogs);
+        }
+        final HashMap<String, TableInfo.Column> _columnsSubscriptionCache = new HashMap<String, TableInfo.Column>(8);
+        _columnsSubscriptionCache.put("id", new TableInfo.Column("id", "INTEGER", true, 1, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("planType", new TableInfo.Column("planType", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("status", new TableInfo.Column("status", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("featuresJson", new TableInfo.Column("featuresJson", "TEXT", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("dailyQuotaTotal", new TableInfo.Column("dailyQuotaTotal", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("dailyQuotaUsed", new TableInfo.Column("dailyQuotaUsed", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("validUntil", new TableInfo.Column("validUntil", "TEXT", false, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        _columnsSubscriptionCache.put("updatedAt", new TableInfo.Column("updatedAt", "INTEGER", true, 0, null, TableInfo.CREATED_FROM_ENTITY));
+        final HashSet<TableInfo.ForeignKey> _foreignKeysSubscriptionCache = new HashSet<TableInfo.ForeignKey>(0);
+        final HashSet<TableInfo.Index> _indicesSubscriptionCache = new HashSet<TableInfo.Index>(0);
+        final TableInfo _infoSubscriptionCache = new TableInfo("subscription_cache", _columnsSubscriptionCache, _foreignKeysSubscriptionCache, _indicesSubscriptionCache);
+        final TableInfo _existingSubscriptionCache = TableInfo.read(db, "subscription_cache");
+        if (!_infoSubscriptionCache.equals(_existingSubscriptionCache)) {
+          return new RoomOpenHelper.ValidationResult(false, "subscription_cache(com.aitutor.app.data.local.entity.SubscriptionCacheEntity).\n"
+                  + " Expected:\n" + _infoSubscriptionCache + "\n"
+                  + " Found:\n" + _existingSubscriptionCache);
+        }
         return new RoomOpenHelper.ValidationResult(true, null);
       }
-    }, "4586993ec42af9f1dc5f63354939dbce", "5e6ff214560cdf4e8a0b0d1ad95a0fea");
+    }, "4a9a1c5226f643086feba3d8f4cbd029", "57d43d310b97c89c2e0dc237b4d2a529");
     final SupportSQLiteOpenHelper.Configuration _sqliteConfig = SupportSQLiteOpenHelper.Configuration.builder(config.context).name(config.name).callback(_openCallback).build();
     final SupportSQLiteOpenHelper _helper = config.sqliteOpenHelperFactory.create(_sqliteConfig);
     return _helper;
@@ -269,7 +361,7 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
   protected InvalidationTracker createInvalidationTracker() {
     final HashMap<String, String> _shadowTablesMap = new HashMap<String, String>(0);
     final HashMap<String, Set<String>> _viewTables = new HashMap<String, Set<String>>(0);
-    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "conversations","messages","learning_records","knowledge_points","quiz_records","pending_submissions","wrong_answers");
+    return new InvalidationTracker(this, _shadowTablesMap, _viewTables, "conversations","messages","learning_records","knowledge_points","quiz_records","pending_submissions","wrong_answers","achievements","user_score","score_logs","subscription_cache");
   }
 
   @Override
@@ -292,6 +384,10 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
       _db.execSQL("DELETE FROM `quiz_records`");
       _db.execSQL("DELETE FROM `pending_submissions`");
       _db.execSQL("DELETE FROM `wrong_answers`");
+      _db.execSQL("DELETE FROM `achievements`");
+      _db.execSQL("DELETE FROM `user_score`");
+      _db.execSQL("DELETE FROM `score_logs`");
+      _db.execSQL("DELETE FROM `subscription_cache`");
       super.setTransactionSuccessful();
     } finally {
       super.endTransaction();
@@ -315,6 +411,10 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
     _typeConvertersMap.put(QuizRecordDao.class, QuizRecordDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(PendingSubmissionDao.class, PendingSubmissionDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(WrongAnswerDao.class, WrongAnswerDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(AchievementDao.class, AchievementDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(UserScoreDao.class, UserScoreDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(SubscriptionCacheDao.class, SubscriptionCacheDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(ScoreLogDao.class, ScoreLogDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -413,6 +513,62 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
           _wrongAnswerDao = new WrongAnswerDao_Impl(this);
         }
         return _wrongAnswerDao;
+      }
+    }
+  }
+
+  @Override
+  public AchievementDao achievementDao() {
+    if (_achievementDao != null) {
+      return _achievementDao;
+    } else {
+      synchronized(this) {
+        if(_achievementDao == null) {
+          _achievementDao = new AchievementDao_Impl(this);
+        }
+        return _achievementDao;
+      }
+    }
+  }
+
+  @Override
+  public UserScoreDao userScoreDao() {
+    if (_userScoreDao != null) {
+      return _userScoreDao;
+    } else {
+      synchronized(this) {
+        if(_userScoreDao == null) {
+          _userScoreDao = new UserScoreDao_Impl(this);
+        }
+        return _userScoreDao;
+      }
+    }
+  }
+
+  @Override
+  public SubscriptionCacheDao subscriptionCacheDao() {
+    if (_subscriptionCacheDao != null) {
+      return _subscriptionCacheDao;
+    } else {
+      synchronized(this) {
+        if(_subscriptionCacheDao == null) {
+          _subscriptionCacheDao = new SubscriptionCacheDao_Impl(this);
+        }
+        return _subscriptionCacheDao;
+      }
+    }
+  }
+
+  @Override
+  public ScoreLogDao scoreLogDao() {
+    if (_scoreLogDao != null) {
+      return _scoreLogDao;
+    } else {
+      synchronized(this) {
+        if(_scoreLogDao == null) {
+          _scoreLogDao = new ScoreLogDao_Impl(this);
+        }
+        return _scoreLogDao;
       }
     }
   }

@@ -1,6 +1,7 @@
 package com.aitutor.app.ui.screen.dashboard.components
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -136,6 +137,7 @@ fun AchievementGrid(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                @OptIn(ExperimentalFoundationApi::class)
                 items(achievements) { aws ->
                     AchievementBadge(
                         achievementWithStatus = aws,

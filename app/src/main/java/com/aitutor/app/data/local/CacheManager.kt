@@ -8,6 +8,7 @@ import coil.memory.MemoryCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -27,7 +28,7 @@ data class CacheSize(
  */
 @Singleton
 class CacheManager @Inject constructor(
-    private val context: Context
+    @ApplicationContext private val context: Context
 ) {
     private val logDir: File get() = File(context.cacheDir, "logs")
     private val tempDir: File get() = File(context.cacheDir, "temp")
@@ -43,7 +44,7 @@ class CacheManager @Inject constructor(
         }
 
         val diskSize = imageLoader?.diskCache?.let { cache ->
-            measureDirSize(File(cache.directory))
+            measureDirSize(cache.directory.toFile())
         } ?: 0L
 
         val memorySize = imageLoader?.memoryCache?.let { cache ->

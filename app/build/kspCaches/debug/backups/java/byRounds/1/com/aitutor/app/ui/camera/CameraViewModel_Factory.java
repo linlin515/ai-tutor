@@ -2,6 +2,7 @@ package com.aitutor.app.ui.camera;
 
 import android.content.Context;
 import com.aitutor.app.domain.repository.ChatRepository;
+import com.aitutor.app.domain.repository.SolveRepository;
 import dagger.internal.DaggerGenerated;
 import dagger.internal.Factory;
 import dagger.internal.QualifierMetadata;
@@ -25,25 +26,29 @@ import javax.inject.Provider;
 public final class CameraViewModel_Factory implements Factory<CameraViewModel> {
   private final Provider<ChatRepository> chatRepositoryProvider;
 
+  private final Provider<SolveRepository> solveRepositoryProvider;
+
   private final Provider<Context> contextProvider;
 
   public CameraViewModel_Factory(Provider<ChatRepository> chatRepositoryProvider,
-      Provider<Context> contextProvider) {
+      Provider<SolveRepository> solveRepositoryProvider, Provider<Context> contextProvider) {
     this.chatRepositoryProvider = chatRepositoryProvider;
+    this.solveRepositoryProvider = solveRepositoryProvider;
     this.contextProvider = contextProvider;
   }
 
   @Override
   public CameraViewModel get() {
-    return newInstance(chatRepositoryProvider.get(), contextProvider.get());
+    return newInstance(chatRepositoryProvider.get(), solveRepositoryProvider.get(), contextProvider.get());
   }
 
   public static CameraViewModel_Factory create(Provider<ChatRepository> chatRepositoryProvider,
-      Provider<Context> contextProvider) {
-    return new CameraViewModel_Factory(chatRepositoryProvider, contextProvider);
+      Provider<SolveRepository> solveRepositoryProvider, Provider<Context> contextProvider) {
+    return new CameraViewModel_Factory(chatRepositoryProvider, solveRepositoryProvider, contextProvider);
   }
 
-  public static CameraViewModel newInstance(ChatRepository chatRepository, Context context) {
-    return new CameraViewModel(chatRepository, context);
+  public static CameraViewModel newInstance(ChatRepository chatRepository,
+      SolveRepository solveRepository, Context context) {
+    return new CameraViewModel(chatRepository, solveRepository, context);
   }
 }

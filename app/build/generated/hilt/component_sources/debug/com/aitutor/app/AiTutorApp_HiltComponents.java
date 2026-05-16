@@ -1,6 +1,7 @@
 package com.aitutor.app;
 
 import com.aitutor.app.di.DatabaseModule;
+import com.aitutor.app.di.GsonModule;
 import com.aitutor.app.di.NetworkModule;
 import com.aitutor.app.di.RepositoryModule;
 import com.aitutor.app.di.SpeechModule;
@@ -12,6 +13,7 @@ import com.aitutor.app.ui.profile.ProfileViewModel_HiltModules;
 import com.aitutor.app.ui.screen.dashboard.DashboardViewModel_HiltModules;
 import com.aitutor.app.ui.screen.quiz.QuizViewModel_HiltModules;
 import com.aitutor.app.ui.screen.review.ReviewViewModel_HiltModules;
+import com.aitutor.app.ui.screen.subscription.SubscriptionViewModel_HiltModules;
 import com.aitutor.app.ui.settings.SettingsViewModel_HiltModules;
 import com.aitutor.app.ui.splash.SplashViewModel_HiltModules;
 import dagger.Binds;
@@ -142,6 +144,7 @@ public final class AiTutorApp_HiltComponents {
           ServiceCBuilderModule.class,
           ApplicationContextModule.class,
           DatabaseModule.class,
+          GsonModule.class,
           HiltWrapper_FragmentGetContextFix_FragmentGetContextFixModule.class,
           NetworkModule.class,
           RepositoryModule.class,
@@ -181,7 +184,8 @@ public final class AiTutorApp_HiltComponents {
           QuizViewModel_HiltModules.KeyModule.class,
           ReviewViewModel_HiltModules.KeyModule.class,
           SettingsViewModel_HiltModules.KeyModule.class,
-          SplashViewModel_HiltModules.KeyModule.class
+          SplashViewModel_HiltModules.KeyModule.class,
+          SubscriptionViewModel_HiltModules.KeyModule.class
       }
   )
   @ActivityRetainedScoped
@@ -227,7 +231,8 @@ public final class AiTutorApp_HiltComponents {
           QuizViewModel_HiltModules.BindsModule.class,
           ReviewViewModel_HiltModules.BindsModule.class,
           SettingsViewModel_HiltModules.BindsModule.class,
-          SplashViewModel_HiltModules.BindsModule.class
+          SplashViewModel_HiltModules.BindsModule.class,
+          SubscriptionViewModel_HiltModules.BindsModule.class
       }
   )
   @ViewModelScoped
