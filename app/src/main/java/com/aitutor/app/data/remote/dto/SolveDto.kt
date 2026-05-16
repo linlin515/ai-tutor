@@ -61,3 +61,27 @@ data class SolveRetryRequest(
     @SerializedName("step_index") val stepIndex: Int,
     @SerializedName("question") val question: String
 )
+
+/**
+ * Request body for solve/steps endpoint.
+ */
+data class SolveStepsRequest(
+    @SerializedName("question") val question: String,
+    @SerializedName("grade") val grade: String = "auto",
+    @SerializedName("subject") val subject: String = "auto",
+    @SerializedName("history") val history: List<Map<String, String>>? = null
+)
+
+/**
+ * Response from solve/steps endpoint.
+ */
+data class SolveStepsResponse(
+    @SerializedName("steps") val steps: List<SolveStepDto>,
+    @SerializedName("difficulty") val difficulty: String = "medium"
+)
+
+data class SolveStepDto(
+    @SerializedName("title") val title: String,
+    @SerializedName("content") val content: String,
+    @SerializedName("formula") val formula: String? = null
+)

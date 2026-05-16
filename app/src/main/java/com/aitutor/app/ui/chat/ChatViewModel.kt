@@ -13,10 +13,12 @@ import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.ChatMode
 import com.aitutor.app.domain.model.Conversation
 import com.aitutor.app.domain.model.MessageStatus
+import com.aitutor.app.domain.model.MessageType
 import com.aitutor.app.domain.model.TeachingState
 import com.aitutor.app.domain.repository.AuthRepository
 import com.aitutor.app.domain.repository.ChatRepository
 import com.aitutor.app.domain.repository.SettingsRepository
+import com.aitutor.app.domain.repository.SolveRepository
 import com.aitutor.app.domain.repository.VoiceRepository
 import com.aitutor.app.domain.usecase.chat.ProcessTeachingResponseUseCase
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -36,6 +38,7 @@ class ChatViewModel @Inject constructor(
     private val authRepository: AuthRepository,
     private val userProfileRepository: UserProfileRepository,
     private val processTeachingResponseUseCase: ProcessTeachingResponseUseCase,
+    private val solveRepository: SolveRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -477,6 +480,36 @@ class ChatViewModel @Inject constructor(
 
     fun stopSpeaking() {
         voiceRepository.stopSpeaking()
+    }
+
+    /**
+     * 获取自适应分步讲解（F41），结果以 markdown 格式插入聊天。
+     */
+    fun fetchSolveSteps(question: String) {
+        if (question.isBlank()) return
+        viewModelScope.launch {
+            val result = solveRepository.getSolveSteps(
+                question = question,
+                grade = uiState.userGrade.orEmpty(),
+                subject = uiState.difficultyLevel
+            )
+            result.onSuccess { response ->
+                val stepsText = response.steps.mapIndexed { i, step ->
+                    "**步骤 ${i + 1}: ${step.title}**\n\n${step.content}" +
+                        (step.formula?.let { "\n\n$${it}$" } ?: "")
+                }.joinToString("\n\n---\n\n")
+                val stepMessage = ChatMessage(
+                    conversationId = uiState.currentConversationId,
+                    content = "### 📖 分步讲解\n\n$stepsText",
+                    isUser = false,
+                    contentType = MessageType.TEXT,
+                    status = MessageStatus.SENT
+                )
+                // Don't save to DB — just transient display via uiState
+            }.onFailure {
+                uiState = uiState.copy(errorMessage = "获取讲解失败: ${it.message}")
+            }
+        }
     }
 
     override fun onCleared() {

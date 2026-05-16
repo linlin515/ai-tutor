@@ -580,7 +580,7 @@ public final class DaggerAiTutorApp_HiltComponents_SingletonC {
           return (T) new CameraViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.solveRepositoryImplProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 1: // com.aitutor.app.ui.chat.ChatViewModel 
-          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.voiceRepositoryImplProvider.get(), singletonCImpl.settingsRepositoryImplProvider.get(), (AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get(), singletonCImpl.userProfileRepositoryProvider.get(), viewModelCImpl.processTeachingResponseUseCase(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
+          return (T) new ChatViewModel(singletonCImpl.chatRepositoryImplProvider.get(), singletonCImpl.voiceRepositoryImplProvider.get(), singletonCImpl.settingsRepositoryImplProvider.get(), (AuthRepository) ((Provider) singletonCImpl.authRepositoryImplProvider).get(), singletonCImpl.userProfileRepositoryProvider.get(), viewModelCImpl.processTeachingResponseUseCase(), singletonCImpl.solveRepositoryImplProvider.get(), ApplicationContextModule_ProvideContextFactory.provideContext(singletonCImpl.applicationContextModule));
 
           case 2: // com.aitutor.app.ui.conversation.ConversationViewModel 
           return (T) new ConversationViewModel(singletonCImpl.chatRepositoryImplProvider.get());

@@ -50,6 +50,9 @@ interface AiTutorApi {
     @POST("api/v1/solve/step/retry")
     suspend fun solveRetryStep(@Body request: SolveRetryRequest): Response<ApiResponse<String>>
 
+    @POST("api/v1/solve/steps")
+    suspend fun solveSteps(@Body request: SolveStepsRequest): Response<ApiResponse<SolveStepsResponse>>
+
     // Streaming image upload (with conversation_id)
     @Multipart
     @POST("api/v1/chat/image")

@@ -35,4 +35,18 @@ interface SolveRepository {
         stepIndex: Int,
         question: String
     ): Result<String>
+
+    /**
+     * Get adaptive step-by-step explanation for a text question.
+     *
+     * @param question the question text
+     * @param grade    student grade for adaptive difficulty
+     * @param subject  subject category
+     * @return success with steps or failure
+     */
+    suspend fun getSolveSteps(
+        question: String,
+        grade: String = "auto",
+        subject: String = "auto"
+    ): Result<com.aitutor.app.data.remote.dto.SolveStepsResponse>
 }
