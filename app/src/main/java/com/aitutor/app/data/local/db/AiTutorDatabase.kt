@@ -9,6 +9,7 @@ import com.aitutor.app.data.local.dao.MessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
 import com.aitutor.app.data.local.dao.ScoreLogDao
+import com.aitutor.app.data.local.dao.StudyReportDao
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao
 import com.aitutor.app.data.local.dao.UserScoreDao
 import com.aitutor.app.data.local.dao.WrongAnswerDao
@@ -52,4 +53,5 @@ abstract class AiTutorDatabase : RoomDatabase() {
     abstract fun userScoreDao(): UserScoreDao
     abstract fun subscriptionCacheDao(): SubscriptionCacheDao
     abstract fun scoreLogDao(): ScoreLogDao
+    abstract fun studyReportDao(): StudyReportDao
 }

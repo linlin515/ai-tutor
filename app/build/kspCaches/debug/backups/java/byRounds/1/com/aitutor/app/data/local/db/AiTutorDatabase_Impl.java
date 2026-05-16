@@ -25,6 +25,8 @@ import com.aitutor.app.data.local.dao.QuizRecordDao;
 import com.aitutor.app.data.local.dao.QuizRecordDao_Impl;
 import com.aitutor.app.data.local.dao.ScoreLogDao;
 import com.aitutor.app.data.local.dao.ScoreLogDao_Impl;
+import com.aitutor.app.data.local.dao.StudyReportDao;
+import com.aitutor.app.data.local.dao.StudyReportDao_Impl;
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao;
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao_Impl;
 import com.aitutor.app.data.local.dao.UserScoreDao;
@@ -66,6 +68,8 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
   private volatile SubscriptionCacheDao _subscriptionCacheDao;
 
   private volatile ScoreLogDao _scoreLogDao;
+
+  private volatile StudyReportDao _studyReportDao;
 
   @Override
   @NonNull
@@ -415,6 +419,7 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
     _typeConvertersMap.put(UserScoreDao.class, UserScoreDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(SubscriptionCacheDao.class, SubscriptionCacheDao_Impl.getRequiredConverters());
     _typeConvertersMap.put(ScoreLogDao.class, ScoreLogDao_Impl.getRequiredConverters());
+    _typeConvertersMap.put(StudyReportDao.class, StudyReportDao_Impl.getRequiredConverters());
     return _typeConvertersMap;
   }
 
@@ -569,6 +574,20 @@ public final class AiTutorDatabase_Impl extends AiTutorDatabase {
           _scoreLogDao = new ScoreLogDao_Impl(this);
         }
         return _scoreLogDao;
+      }
+    }
+  }
+
+  @Override
+  public StudyReportDao studyReportDao() {
+    if (_studyReportDao != null) {
+      return _studyReportDao;
+    } else {
+      synchronized(this) {
+        if(_studyReportDao == null) {
+          _studyReportDao = new StudyReportDao_Impl(this);
+        }
+        return _studyReportDao;
       }
     }
   }

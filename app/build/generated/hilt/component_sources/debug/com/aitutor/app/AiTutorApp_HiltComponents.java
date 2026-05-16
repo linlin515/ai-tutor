@@ -10,6 +10,7 @@ import com.aitutor.app.ui.camera.CameraViewModel_HiltModules;
 import com.aitutor.app.ui.chat.ChatViewModel_HiltModules;
 import com.aitutor.app.ui.conversation.ConversationViewModel_HiltModules;
 import com.aitutor.app.ui.profile.ProfileViewModel_HiltModules;
+import com.aitutor.app.ui.report.ReportExportViewModel_HiltModules;
 import com.aitutor.app.ui.screen.dashboard.DashboardViewModel_HiltModules;
 import com.aitutor.app.ui.screen.quiz.QuizViewModel_HiltModules;
 import com.aitutor.app.ui.screen.review.ReviewViewModel_HiltModules;
@@ -182,6 +183,7 @@ public final class AiTutorApp_HiltComponents {
           LoginViewModel_HiltModules.KeyModule.class,
           ProfileViewModel_HiltModules.KeyModule.class,
           QuizViewModel_HiltModules.KeyModule.class,
+          ReportExportViewModel_HiltModules.KeyModule.class,
           ReviewViewModel_HiltModules.KeyModule.class,
           SettingsViewModel_HiltModules.KeyModule.class,
           SplashViewModel_HiltModules.KeyModule.class,
@@ -229,6 +231,7 @@ public final class AiTutorApp_HiltComponents {
           LoginViewModel_HiltModules.BindsModule.class,
           ProfileViewModel_HiltModules.BindsModule.class,
           QuizViewModel_HiltModules.BindsModule.class,
+          ReportExportViewModel_HiltModules.BindsModule.class,
           ReviewViewModel_HiltModules.BindsModule.class,
           SettingsViewModel_HiltModules.BindsModule.class,
           SplashViewModel_HiltModules.BindsModule.class,

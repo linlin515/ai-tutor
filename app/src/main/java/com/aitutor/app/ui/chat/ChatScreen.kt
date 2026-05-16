@@ -19,10 +19,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.aitutor.app.domain.model.AgentState
+import com.aitutor.app.domain.model.AgentStepType
 import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.ChatMode
 import com.aitutor.app.domain.model.MessageStatus
+import com.aitutor.app.domain.model.MessageType
 import com.aitutor.app.domain.model.TeachingState
+import com.aitutor.app.ui.chat.components.AgentStatusIndicator
+import com.aitutor.app.ui.chat.components.AgentSwitch
+import com.aitutor.app.ui.chat.components.AgentThoughtBubble
 import com.aitutor.app.ui.chat.components.ChatInputBar
 import com.aitutor.app.ui.chat.components.CollapsibleStepCard
 import com.aitutor.app.ui.chat.components.DifficultySwitcher
@@ -132,6 +138,17 @@ fun ChatScreen(
                         )
                     }
 
+                    // v2.0 Agent: Agent 模式切换按钮
+                    IconButton(onClick = { viewModel.toggleAgentSwitch() }) {
+                        Icon(
+                            imageVector = Icons.Default.Psychology,
+                            contentDescription = "Agent 模式",
+                            tint = if (state.agentEnabled)
+                                   MaterialTheme.colorScheme.primary
+                                   else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+
                     IconButton(onClick = { viewModel.createNewConversation() }) {
                         Icon(Icons.Default.Add, contentDescription = "新建对话")
                     }
@@ -191,6 +208,21 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 12.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+
+                // v2.0 Agent: Agent 模式开关
+                if (state.showAgentSwitch) {
+                    Surface(
+                        tonalElevation = 3.dp,
+                        shadowElevation = 2.dp,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        AgentSwitch(
+                            enabled = state.agentEnabled,
+                            onToggle = { viewModel.toggleAgentMode() },
+                            modifier = Modifier.fillMaxWidth()
                         )
                     }
                 }
@@ -318,7 +350,15 @@ fun ChatScreen(
                         items = state.messages,
                         key = { it.id }
                     ) { message ->
-                        if (!message.isUser && isStepContent(message.content)) {
+                        if (message.contentType == MessageType.AGENT_STEP && message.agentStepType != null) {
+                            // v2.0 Agent: Agent 步骤可视化
+                            AgentThoughtBubble(
+                                agentStepType = message.agentStepType,
+                                toolName = message.toolName,
+                                toolQuery = message.toolQuery,
+                                toolResult = message.toolResult
+                            )
+                        } else if (!message.isUser && isStepContent(message.content)) {
                             // Render step-based messages as CollapsibleStepCards (F41)
                             val steps = parseSteps(message.content)
                             steps.forEach { (stepNum, totalSteps, title, content) ->
@@ -367,6 +407,13 @@ fun ChatScreen(
                                 stepNumber = state.teachingState.step,
                                 totalSteps = state.teachingState.totalSteps
                             )
+                        }
+                    }
+
+                    // v2.0 Agent: Agent 状态指示器
+                    if (state.agentEnabled && state.agentState != AgentState.IDLE) {
+                        item(key = "agent_status") {
+                            AgentStatusIndicator(agentState = state.agentState)
                         }
                     }
 

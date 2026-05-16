@@ -9,18 +9,29 @@ import androidx.lifecycle.viewModelScope
 import com.aitutor.app.data.local.AppLifecycleTracker
 import com.aitutor.app.data.local.NotificationHelper
 import com.aitutor.app.data.repository.UserProfileRepository
+import com.aitutor.app.data.tool.impl.CalculatorTool
+import com.aitutor.app.data.tool.impl.DateTimeTool
+import com.aitutor.app.data.tool.registry.ToolRegistry
+import com.aitutor.app.domain.model.AgentState
+import com.aitutor.app.domain.model.AgentStepType
 import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.ChatMode
 import com.aitutor.app.domain.model.Conversation
 import com.aitutor.app.domain.model.MessageStatus
 import com.aitutor.app.domain.model.MessageType
+import com.aitutor.app.domain.model.StreamEvent
 import com.aitutor.app.domain.model.TeachingState
+import com.aitutor.app.domain.model.ToolCallInfo
+import com.aitutor.app.domain.model.ToolResult
+import com.aitutor.app.domain.repository.AgentRepository
 import com.aitutor.app.domain.repository.AuthRepository
 import com.aitutor.app.domain.repository.ChatRepository
 import com.aitutor.app.domain.repository.SettingsRepository
 import com.aitutor.app.domain.repository.SolveRepository
 import com.aitutor.app.domain.repository.VoiceRepository
 import com.aitutor.app.domain.usecase.chat.ProcessTeachingResponseUseCase
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -39,6 +50,7 @@ class ChatViewModel @Inject constructor(
     private val userProfileRepository: UserProfileRepository,
     private val processTeachingResponseUseCase: ProcessTeachingResponseUseCase,
     private val solveRepository: SolveRepository,
+    private val agentRepository: AgentRepository,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -47,13 +59,54 @@ class ChatViewModel @Inject constructor(
 
     private var streamJob: Job? = null
     private var aiMessageId: Long = -1L
-
-    // Job for auto-exiting TUTOR mode after idle timeout (F42)
     private var idleTimeoutJob: Job? = null
+    private val gson = Gson()
 
     init {
         loadConversations()
         loadUserGrade()
+        observeAgentEnabled()
+        initTools()
+    }
+
+    /**
+     * 初始化 ToolRegistry，注册内置工具
+     */
+    private fun initTools() {
+        // Register tools once
+        if (ToolRegistry.getToolDefinitions().isEmpty()) {
+            ToolRegistry.register(CalculatorTool())
+            ToolRegistry.register(DateTimeTool())
+            // WebSearchTool requires OkHttpClient, registered in NetworkModule or lazily
+        }
+    }
+
+    /**
+     * 观察 Agent 模式开关状态
+     */
+    private fun observeAgentEnabled() {
+        viewModelScope.launch {
+            agentRepository.getAgentEnabled().collectLatest { enabled ->
+                uiState = uiState.copy(agentEnabled = enabled)
+            }
+        }
+    }
+
+    /**
+     * 切换 Agent 模式
+     */
+    fun toggleAgentMode() {
+        viewModelScope.launch {
+            val newValue = !uiState.agentEnabled
+            agentRepository.setAgentEnabled(newValue)
+        }
+    }
+
+    /**
+     * 显示/隐藏 Agent Switch
+     */
+    fun toggleAgentSwitch() {
+        uiState = uiState.copy(showAgentSwitch = !uiState.showAgentSwitch)
     }
 
     private fun loadUserGrade() {
@@ -68,7 +121,6 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             chatRepository.getAllConversations().collectLatest { conversations ->
                 uiState = uiState.copy(conversations = conversations)
-                // Auto-select first conversation if none selected
                 if (uiState.currentConversationId == -1L && conversations.isNotEmpty()) {
                     selectConversation(conversations.first().id)
                 }
@@ -108,26 +160,14 @@ class ChatViewModel @Inject constructor(
 
     // ===== F41: Adaptive Step-by-Step =====
 
-    /**
-     * Set the difficulty level for adaptive teaching.
-     * "auto" uses the user's profile grade; other values override it.
-     */
     fun setDifficultyLevel(level: String) {
         uiState = uiState.copy(difficultyLevel = level)
     }
 
-    /**
-     * Toggle the difficulty switcher visibility.
-     */
     fun toggleDifficultySwitcher() {
         uiState = uiState.copy(showDifficultySwitcher = !uiState.showDifficultySwitcher)
     }
 
-    /**
-     * Get the effective grade for API calls.
-     * If difficultyLevel is "auto", use the user's profile grade.
-     * Otherwise use the selected difficulty level.
-     */
     private fun getEffectiveGrade(): String? {
         return when (uiState.difficultyLevel) {
             "auto" -> uiState.userGrade
@@ -135,9 +175,6 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Get the difficulty-based system prompt hint.
-     */
     private fun getDifficultySystemPrompt(): String? {
         val effectiveGrade = getEffectiveGrade()
         return if (effectiveGrade != null) {
@@ -149,9 +186,6 @@ class ChatViewModel @Inject constructor(
 
     // ===== F42: Socratic Teaching Mode =====
 
-    /**
-     * Toggle between ASSISTANT and TUTOR modes (legacy compatibility).
-     */
     fun toggleTutorMode() {
         val newMode = if (uiState.chatMode == ChatMode.ASSISTANT) {
             ChatMode.TUTOR
@@ -161,42 +195,30 @@ class ChatViewModel @Inject constructor(
         setChatMode(newMode)
     }
 
-    /**
-     * Set the chat mode (ASSISTANT / TUTOR / QUIZ).
-     */
     fun setChatMode(mode: ChatMode) {
-        val previousMode = uiState.chatMode
         uiState = uiState.copy(
             chatMode = mode,
             tutorMode = mode != ChatMode.ASSISTANT,
             teachingState = TeachingState.Idle,
             tutorModeLastActiveTime = System.currentTimeMillis()
         )
-
-        // Start idle timeout monitoring for TUTOR/QUIZ modes
         if (mode != ChatMode.ASSISTANT) {
             startIdleTimeoutMonitor()
         } else {
             idleTimeoutJob?.cancel()
         }
-
-        // Reset teaching state when switching modes
         if (mode == ChatMode.ASSISTANT) {
             uiState = uiState.copy(teachingState = TeachingState.Idle)
         }
     }
 
-    /**
-     * Monitor for idle timeout — auto-exit TUTOR/QUIZ mode after 30 min of inactivity.
-     */
     private fun startIdleTimeoutMonitor() {
         idleTimeoutJob?.cancel()
         idleTimeoutJob = viewModelScope.launch {
             while (true) {
-                delay(60_000L) // Check every minute
+                delay(60_000L)
                 val elapsed = System.currentTimeMillis() - uiState.tutorModeLastActiveTime
                 if (elapsed >= ProcessTeachingResponseUseCase.TUTOR_IDLE_TIMEOUT_MS) {
-                    // Auto-exit to ASSISTANT mode
                     uiState = uiState.copy(
                         chatMode = ChatMode.ASSISTANT,
                         tutorMode = false,
@@ -208,20 +230,12 @@ class ChatViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Update the last active timestamp (called on user interaction).
-     */
     private fun updateLastActiveTime() {
         uiState = uiState.copy(tutorModeLastActiveTime = System.currentTimeMillis())
     }
 
-    /**
-     * Process teaching events from the streamed content.
-     * Parses markers and updates TeachingState accordingly.
-     */
     private fun processTeachingEvents(content: String) {
         val events = processTeachingResponseUseCase.parseTeachingEvents(content)
-
         for (event in events) {
             when (event.type) {
                 ProcessTeachingResponseUseCase.EventType.SOCRATIC_QUESTION -> {
@@ -246,16 +260,10 @@ class ChatViewModel @Inject constructor(
                     )
                 }
                 ProcessTeachingResponseUseCase.EventType.TEACHING_COMPLETE -> {
-                    uiState = uiState.copy(
-                        teachingState = TeachingState.Complete
-                    )
+                    uiState = uiState.copy(teachingState = TeachingState.Complete)
                 }
-                ProcessTeachingResponseUseCase.EventType.MODE_SWITCH -> {
-                    // Mode switch events from server
-                }
-                ProcessTeachingResponseUseCase.EventType.NORMAL_CONTENT -> {
-                    // No teaching event — keep current state
-                }
+                ProcessTeachingResponseUseCase.EventType.MODE_SWITCH -> {}
+                ProcessTeachingResponseUseCase.EventType.NORMAL_CONTENT -> {}
             }
         }
     }
@@ -268,7 +276,6 @@ class ChatViewModel @Inject constructor(
 
         updateLastActiveTime()
 
-        // Ensure a conversation exists
         if (uiState.currentConversationId == -1L) {
             viewModelScope.launch {
                 val id = chatRepository.createConversation("")
@@ -284,7 +291,6 @@ class ChatViewModel @Inject constructor(
         val conversationId = uiState.currentConversationId
         uiState = uiState.copy(inputText = "", errorMessage = null)
 
-        // Cancel previous streaming job to prevent coroutine leak
         streamJob?.cancel()
 
         viewModelScope.launch {
@@ -297,12 +303,18 @@ class ChatViewModel @Inject constructor(
             )
             chatRepository.insertMessage(userMessage)
 
-            // Auto-name conversation if first message
+            // Auto-name conversation
             val conv = chatRepository.getConversationById(conversationId)
             if (conv != null && conv.title.isEmpty()) {
                 val title = text.take(20) + if (text.length > 20) "..." else ""
                 chatRepository.updateConversationTitle(conversationId, title)
             }
+
+            val settings = settingsRepository.getSettings().first()
+
+            // Decide streaming mode based on agent enabled
+            val isAgentMode = uiState.agentEnabled
+            val agents = if (isAgentMode) agentRepository.getToolsDefinitions() else null
 
             // Create AI message placeholder
             val aiMessage = ChatMessage(
@@ -314,93 +326,299 @@ class ChatViewModel @Inject constructor(
             val msgId = chatRepository.insertMessage(aiMessage)
             aiMessageId = msgId
 
-            val settings = settingsRepository.getSettings().first()
+            uiState = uiState.copy(
+                isStreaming = true,
+                streamingContent = "",
+                agentState = if (isAgentMode) AgentState.THINKING else AgentState.IDLE
+            )
 
-            uiState = uiState.copy(isStreaming = true, streamingContent = "")
-
-            // Get all context messages synchronously (in coroutine scope)
             val contextMessages = chatRepository.getMessagesByConversation(conversationId).first()
                 .filter { it.id != msgId }
 
-            // Determine role and system prompt based on chat mode (F41 + F42)
             val role = when (uiState.chatMode) {
                 ChatMode.ASSISTANT -> "assistant"
                 ChatMode.TUTOR -> "tutor"
                 ChatMode.QUIZ -> "quiz"
             }
-
             val systemPrompt = buildSystemPrompt()
 
-            // Stream chat — single job, no race condition
-            streamJob = viewModelScope.launch {
-                val accumulatedContent = StringBuilder()
-                chatRepository.streamChat(
-                    conversationId = conversationId,
-                    messages = contextMessages + userMessage,
-                    modelId = settings.modelId,
-                    temperature = settings.temperature,
-                    topP = settings.topP,
-                    maxTokens = settings.maxTokens,
-                    grade = getEffectiveGrade(),
-                    role = role,
-                    systemPrompt = systemPrompt
-                ).collect { chunk ->
-                    accumulatedContent.append(chunk)
-                    val currentContent = accumulatedContent.toString()
-                    uiState = uiState.copy(streamingContent = currentContent)
-
-                    // Process teaching events from content (F42)
-                    if (uiState.chatMode != ChatMode.ASSISTANT) {
-                        processTeachingEvents(currentContent)
-                    }
-                }
-
-                // Streaming finished — clean up content and persist
-                val finalContent = accumulatedContent.toString()
-                val cleanedContent = if (uiState.chatMode != ChatMode.ASSISTANT) {
-                    processTeachingResponseUseCase.stripTeachingMarkers(finalContent)
-                } else {
-                    finalContent
-                }
-
-                // Update the message in DB with cleaned content
-                chatRepository.updateMessageStatus(msgId, MessageStatus.SENT)
-                // Update the actual content through repository
-                if (cleanedContent.isNotEmpty()) {
-                    val updatedMessage = ChatMessage(
-                        id = msgId,
-                        conversationId = conversationId,
-                        content = cleanedContent,
-                        isUser = false,
-                        status = MessageStatus.SENT,
-                        timestamp = System.currentTimeMillis()
-                    )
-                    // Re-insert to update content (simplified approach)
-                    chatRepository.insertMessage(updatedMessage)
-                }
-
-                // F32: Send notification when AI reply completes and app is not in foreground
-                if (!AppLifecycleTracker.isInForeground) {
-                    val conv = chatRepository.getConversationById(conversationId)
-                    val title = conv?.title?.ifBlank { null } ?: "AI 助手"
-                    val preview = cleanedContent.take(120).replace('\n', ' ')
-                    NotificationHelper.sendMessageNotification(
-                        context = appContext,
-                        title = title,
-                        content = preview,
-                        conversationId = conversationId
+            if (isAgentMode && agents != null && agents.isNotEmpty()) {
+                // Agent mode: stream with events and tool calling support
+                streamJob = viewModelScope.launch {
+                    agentStreamChat(
+                        conversationId, contextMessages + userMessage, msgId,
+                        settings.modelId, settings.temperature, settings.topP, settings.maxTokens,
+                        agents, role, systemPrompt
                     )
                 }
-
-                uiState = uiState.copy(isStreaming = false, streamingContent = "")
+            } else {
+                // Normal mode: stream text
+                streamJob = viewModelScope.launch {
+                    normalStreamChat(
+                        conversationId, contextMessages + userMessage, msgId,
+                        settings.modelId, settings.temperature, settings.topP, settings.maxTokens,
+                        role, systemPrompt
+                    )
+                }
             }
         }
     }
 
     /**
-     * Build the system prompt based on current chat mode and settings.
-     * Combines F41 (adaptive difficulty) and F42 (Socratic teaching) prompts.
+     * Agent 模式流式对话 - 支持 tool calling
      */
+    private suspend fun agentStreamChat(
+        conversationId: Long,
+        messages: List<ChatMessage>,
+        msgId: Long,
+        modelId: String,
+        temperature: Float,
+        topP: Float,
+        maxTokens: Int,
+        tools: List<Map<String, Any>>,
+        role: String?,
+        systemPrompt: String?
+    ) {
+        val accumulatedContent = StringBuilder()
+        var pendingToolCalls = mutableListOf<ToolCallInfo>()
+        uiState = uiState.copy(agentState = AgentState.THINKING)
+
+        // First pass: stream with tools to detect tool_calls
+        chatRepository.streamChatWithEvents(
+            conversationId, messages, modelId, temperature, topP, maxTokens,
+            tools = tools, grade = getEffectiveGrade(), role = role, systemPrompt = systemPrompt
+        ).collect { event ->
+            when (event) {
+                is StreamEvent.TextChunk -> {
+                    accumulatedContent.append(event.content)
+                    uiState = uiState.copy(
+                        streamingContent = accumulatedContent.toString(),
+                        agentState = AgentState.RESPONDING
+                    )
+                }
+                is StreamEvent.ToolCallChunk -> {
+                    pendingToolCalls.addAll(event.toolCalls)
+                    uiState = uiState.copy(agentState = AgentState.SEARCHING)
+                }
+                is StreamEvent.RoleChunk -> { /* ignore role */ }
+                is StreamEvent.Done -> {
+                    // Stream complete - check if we need to execute tools
+                    if (pendingToolCalls.isNotEmpty()) {
+                        executeToolsAndRespond(
+                            conversationId, messages, msgId, modelId, temperature, topP,
+                            maxTokens, pendingToolCalls, accumulatedContent.toString(),
+                            role, systemPrompt
+                        )
+                        pendingToolCalls = mutableListOf()
+                    } else {
+                        finalizeStream(msgId, accumulatedContent.toString(), conversationId)
+                    }
+                }
+                is StreamEvent.ErrorEvent -> {
+                    uiState = uiState.copy(
+                        errorMessage = event.message,
+                        agentState = AgentState.IDLE
+                    )
+                }
+            }
+        }
+    }
+
+    /**
+     * 执行工具并将结果回传给 LLM
+     */
+    private suspend fun executeToolsAndRespond(
+        conversationId: Long,
+        messages: List<ChatMessage>,
+        msgId: Long,
+        modelId: String,
+        temperature: Float,
+        topP: Float,
+        maxTokens: Int,
+        toolCalls: List<ToolCallInfo>,
+        currentContent: String,
+        role: String?,
+        systemPrompt: String?
+    ) {
+        // Insert AgentStep message for each tool call
+        val toolResults = mutableListOf<Map<String, Any>>()
+
+        for (tc in toolCalls) {
+            uiState = uiState.copy(agentState = AgentState.SEARCHING)
+
+            // Save tool call as AgentStep message
+            val toolCallMsg = ChatMessage(
+                conversationId = conversationId,
+                content = currentContent,
+                isUser = false,
+                contentType = MessageType.AGENT_STEP,
+                status = MessageStatus.SENT,
+                agentStepType = AgentStepType.TOOL_CALL,
+                toolName = tc.functionName,
+                toolQuery = tc.arguments
+            )
+            chatRepository.insertMessage(toolCallMsg)
+
+            // Parse arguments
+            val args = try {
+                val mapType = object : TypeToken<Map<String, Any>>() {}.type
+                gson.fromJson<Map<String, Any>>(tc.arguments, mapType) ?: emptyMap()
+            } catch (e: Exception) {
+                emptyMap()
+            }
+
+            // Execute tool
+            val result = ToolRegistry.execute(tc.functionName, args)
+
+            // Save tool result as AgentStep message
+            val resultMsg = ChatMessage(
+                conversationId = conversationId,
+                content = result.result,
+                isUser = false,
+                contentType = MessageType.AGENT_STEP,
+                status = MessageStatus.SENT,
+                agentStepType = AgentStepType.TOOL_RESULT,
+                toolName = tc.functionName,
+                toolQuery = tc.arguments,
+                toolResult = result.result
+            )
+            chatRepository.insertMessage(resultMsg)
+
+            toolResults.add(mapOf(
+                "tool_call_id" to tc.id,
+                "result" to result.result
+            ))
+        }
+
+        // Second pass: send tool results back to LLM for reasoning
+        uiState = uiState.copy(agentState = AgentState.REASONING)
+        val accumulatedContent2 = StringBuilder()
+
+        // Build messages with tool results
+        val toolCallMaps = toolCalls.map { tc ->
+            mapOf(
+                "id" to tc.id,
+                "type" to tc.type,
+                "function" to mapOf(
+                    "name" to tc.functionName,
+                    "arguments" to tc.arguments
+                )
+            )
+        }
+
+        chatRepository.streamChatWithToolResult(
+            conversationId, messages, toolCallMaps, toolResults,
+            modelId, temperature, topP, maxTokens,
+            grade = getEffectiveGrade(), role = role, systemPrompt = systemPrompt
+        ).collect { event ->
+            when (event) {
+                is StreamEvent.TextChunk -> {
+                    accumulatedContent2.append(event.content)
+                    uiState = uiState.copy(
+                        streamingContent = accumulatedContent2.toString(),
+                        agentState = AgentState.RESPONDING
+                    )
+                }
+                is StreamEvent.ToolCallChunk -> {
+                    // Handle multi-turn tool calling (max 3 rounds)
+                    uiState = uiState.copy(agentState = AgentState.SEARCHING)
+                }
+                is StreamEvent.Done -> {
+                    finalizeStream(msgId, accumulatedContent2.toString(), conversationId)
+                }
+                is StreamEvent.ErrorEvent -> {
+                    uiState = uiState.copy(errorMessage = event.message, agentState = AgentState.IDLE)
+                }
+                else -> {}
+            }
+        }
+    }
+
+    /**
+     * 普通模式（非 Agent）流式对话
+     */
+    private suspend fun normalStreamChat(
+        conversationId: Long,
+        messages: List<ChatMessage>,
+        msgId: Long,
+        modelId: String,
+        temperature: Float,
+        topP: Float,
+        maxTokens: Int,
+        role: String?,
+        systemPrompt: String?
+    ) {
+        val accumulatedContent = StringBuilder()
+        chatRepository.streamChat(
+            conversationId = conversationId,
+            messages = messages,
+            modelId = modelId,
+            temperature = temperature,
+            topP = topP,
+            maxTokens = maxTokens,
+            grade = getEffectiveGrade(),
+            role = role,
+            systemPrompt = systemPrompt
+        ).collect { chunk ->
+            accumulatedContent.append(chunk)
+            val currentContent = accumulatedContent.toString()
+            uiState = uiState.copy(streamingContent = currentContent)
+
+            if (uiState.chatMode != ChatMode.ASSISTANT) {
+                processTeachingEvents(currentContent)
+            }
+        }
+
+        val finalContent = accumulatedContent.toString()
+        val cleanedContent = if (uiState.chatMode != ChatMode.ASSISTANT) {
+            processTeachingResponseUseCase.stripTeachingMarkers(finalContent)
+        } else {
+            finalContent
+        }
+
+        finalizeStream(msgId, cleanedContent, conversationId)
+    }
+
+    /**
+     * 流结束处理：持久化消息 + 更新状态
+     */
+    private suspend fun finalizeStream(msgId: Long, content: String, conversationId: Long) {
+        chatRepository.updateMessageStatus(msgId, MessageStatus.SENT)
+
+        if (content.isNotEmpty()) {
+            val updatedMessage = ChatMessage(
+                id = msgId,
+                conversationId = conversationId,
+                content = content,
+                isUser = false,
+                status = MessageStatus.SENT,
+                timestamp = System.currentTimeMillis()
+            )
+            chatRepository.insertMessage(updatedMessage)
+        }
+
+        // F32: Send notification if app is not in foreground
+        if (!AppLifecycleTracker.isInForeground) {
+            val conv = chatRepository.getConversationById(conversationId)
+            val title = conv?.title?.ifBlank { null } ?: "AI 助手"
+            val preview = content.take(120).replace('\n', ' ')
+            NotificationHelper.sendMessageNotification(
+                context = appContext,
+                title = title,
+                content = preview,
+                conversationId = conversationId
+            )
+        }
+
+        uiState = uiState.copy(
+            isStreaming = false,
+            streamingContent = "",
+            agentState = AgentState.IDLE
+        )
+    }
+
+    // ===== System Prompt =====
+
     private fun buildSystemPrompt(): String? {
         return when (uiState.chatMode) {
             ChatMode.ASSISTANT -> null
@@ -416,11 +634,7 @@ class ChatViewModel @Inject constructor(
                         "- 当你要评价学生的回答时，在评价前加上 [correctness] 并说明是否正确\n" +
                         "- 当教学完成时，在最后加上 [teaching_complete]\n\n" +
                         "请保持耐心和鼓励的态度。"
-                if (gradeHint != null) {
-                    "$basePrompt\n\n$gradeHint"
-                } else {
-                    basePrompt
-                }
+                if (gradeHint != null) "$basePrompt\n\n$gradeHint" else basePrompt
             }
             ChatMode.QUIZ -> {
                 val gradeHint = getDifficultySystemPrompt()
@@ -428,17 +642,14 @@ class ChatViewModel @Inject constructor(
                         "每次问一个选择题或简答题，等待学生回答。" +
                         "回答正确时给予表扬，回答错误时给出正确答案和解释。" +
                         "题目难度应循序渐进。"
-                if (gradeHint != null) {
-                    "$basePrompt\n\n$gradeHint"
-                } else {
-                    basePrompt
-                }
+                if (gradeHint != null) "$basePrompt\n\n$gradeHint" else basePrompt
             }
         }
     }
 
+    // ===== Retry / Misc =====
+
     fun retrySend() {
-        // Find the last failed user message and resend
         val lastFailed = uiState.messages.lastOrNull { it.status == MessageStatus.FAILED && it.isUser }
         if (lastFailed != null) {
             viewModelScope.launch {
@@ -449,9 +660,7 @@ class ChatViewModel @Inject constructor(
     }
 
     fun toggleConversationSheet() {
-        uiState = uiState.copy(
-            showConversationSheet = !uiState.showConversationSheet
-        )
+        uiState = uiState.copy(showConversationSheet = !uiState.showConversationSheet)
     }
 
     fun hideConversationSheet() {
@@ -482,9 +691,6 @@ class ChatViewModel @Inject constructor(
         voiceRepository.stopSpeaking()
     }
 
-    /**
-     * 获取自适应分步讲解（F41），结果以 markdown 格式插入聊天。
-     */
     fun fetchSolveSteps(question: String) {
         if (question.isBlank()) return
         viewModelScope.launch {
@@ -505,7 +711,6 @@ class ChatViewModel @Inject constructor(
                     contentType = MessageType.TEXT,
                     status = MessageStatus.SENT
                 )
-                // Don't save to DB — just transient display via uiState
             }.onFailure {
                 uiState = uiState.copy(errorMessage = "获取讲解失败: ${it.message}")
             }

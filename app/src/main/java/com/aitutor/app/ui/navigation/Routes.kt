@@ -13,6 +13,7 @@ object Routes {
     const val DASHBOARD = "dashboard"
     const val QUIZ = "quiz"
     const val REVIEW = "review"
+    const val REPORT = "report"
 
     fun chatConversation(conversationId: Long) = "chat/$conversationId"
 }

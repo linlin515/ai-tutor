@@ -2574,3 +2574,1004 @@ domain/model/
 │  └─ Sprint 3: T28/T29/T30 无互依赖 → 2 Coder 并行                           │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
+
+## 13. AI Agent 能力增强模块 (F48)
+
+> 版本：v2.0 新增 | 优先级：P0 | 后端依赖：new-api 原生 tool calling 能力
+
+### 13.1 概述
+
+AI Agent 增强的核心是：**在现有 SSE 流式对话基础上，增加 Tool Calling 支持**，使 AI 能够调用联网搜索、计算器等工具获取实时信息，并展示思考过程。
+
+关键设计原则：
+- **兼容现有架构**：复用现有的 POST /v1/chat/completions SSE 流式通道
+- **客户端执行工具**：工具执行在 Android 端进行（web_search 通过 HTTP，calculator 本地计算）
+- **标准 OpenAI 协议**：利用 new-api 原生的 `tool_calls` SSE 字段，后端透传即可
+- **渐进式切换**：Agent 模式可开关，默认关闭，保留原有非 Agent 模式
+
+### 13.2 架构总览
+
+```text
+                    ┌──────────────────────────────────────┐
+                    │  Agent 模式（v2.0 新增）              │
+                    │  ┌────────┐ ┌────────┐ ┌───────────┐ │
+                    │  │Agent   │ │Tool    │ │AgentThought│ │
+                    │  │Switch  │ │Registry│ │Bubble     │ │
+                    │  └────┬───┘ └───┬────┘ └─────┬─────┘ │
+                    │       │         │             │        │
+                    │  ┌────▼─────────▼─────────────▼─────┐ │
+                    │  │     AgentStateMachine            │ │
+                    │  │  IDLE→THINKING→SEARCHING→       │ │
+                    │  │  REASONING→RESPONDING→IDLE      │ │
+                    │  └────────────────┬─────────────────┘ │
+                    │                   │                    │
+                    │  ┌────────────────▼─────────────────┐ │
+                    │  │     ToolExecEngine                │ │
+                    │  │  ├─ WebSearchClient (HTTP)       │ │
+                    │  │  └─ Calculator (本地)            │ │
+                    │  └───────────────┬──────────────────┘ │
+                    └──────────────────┼────────────────────┘
+                                       │
+  ═════════════════════════════════════╪═══════════════════ 边界
+                                       │
+  ┌────────────────────────────────────▼────────────────────┐
+  │  Backend (透传，v2.0 小幅修改)                            │
+  │  ┌──────────────┐  ┌─────────────┐  ┌───────────────┐  │
+  │  │ POST /v1/    │→ │ httpx 流式  │→ │ new-api       │  │
+  │  │ chat/        │  │ 转发        │  │ (原生支持     │  │
+  │  │ completions  │  │ (工具参数   │  │  tool_calls)  │  │
+  │  │ +tools参数  │  │ 透传)       │  │               │  │
+  │  └──────────────┘  └─────────────┘  └───────────────┘  │
+  └─────────────────────────────────────────────────────────┘
+```
+
+### 13.3 Agent 状态机设计
+
+```text
+       用户发送消息
+           │
+           ▼
+   ┌──────────────┐
+   │    IDLE      │ ←─────────── 流结束回到空闲
+   └──────┬───────┘
+          │ 开始请求LLM
+          ▼
+   ┌──────────────┐      SSE 收到 tool_calls 字段
+   │  THINKING    │ ────────────────────────────────►
+   │  (思考中)     │
+   └──────────────┘
+          │ SSE 收到 content delta（无 tool_calls）
+          ▼                              ┌──────────────┐
+   ┌──────────────┐                      │  SEARCHING   │
+   │  RESPONDING  │                      │  (工具执行中) │
+   │  (流式输出)   │                      └──────┬───────┘
+   └──────┬───────┘                             │ 工具执行完成
+          │ stream complete    ┌──────────────┐  │
+          │ 或 [DONE]          │  REASONING   │◄─┘
+          ▼                    │  (等待AI推理) │
+   ┌──────────────┐            └──────┬───────┘
+   │    IDLE      │                   │ 再次 SSE 接收回复
+   └──────────────┘                   ▼
+                              ┌──────────────┐
+                              │  RESPONDING  │───► IDLE
+                              └──────────────┘
+```
+
+**AgentState** 枚举值：
+
+| 状态 | UI 展示 | 说明 |
+|------|---------|------|
+| IDLE | 正常对话界面 | 非 Agent 状态，等待用户输入 |
+| THINKING | "AI 正在思考..." 动画 | 请求已发出，等待 SSE 第一帧 |
+| SEARCHING | "正在搜索：关键词" + 搜索动画 | SSE 收到 tool_calls，客户端正在执行工具 |
+| REASONING | "AI 正在推理..." | 工具结果已提交回 LLM，等待推理回复 |
+| RESPONDING | 流式内容逐字展示 | SSE content delta 正在输出 |
+
+### 13.4 Tool Calling 消息模型
+
+**新增消息类型：** `MessageType.AGENT_STEP` 和 SSE 端扩展支持 tool_calls。
+
+#### 13.4.1 扩展 ChatMessage 模型
+
+```kotlin
+// domain/model/ChatMessage.kt — 新增字段
+data class ChatMessage(
+    val id: Long = 0,
+    val conversationId: Long,
+    val content: String,
+    val isUser: Boolean,
+    val contentType: MessageType = MessageType.TEXT,
+    val timestamp: Long = System.currentTimeMillis(),
+    val status: MessageStatus = MessageStatus.SENDING,
+    val metadata: String? = null,
+    // v2.0 新增：
+    val agentStepType: AgentStepType? = null,  // Agent 步骤类型
+    val toolName: String? = null,              // 工具名称（如 web_search）
+    val toolQuery: String? = null,             // 工具的输入参数
+    val toolResult: String? = null             // 工具的返回结果
+)
+
+// 新增枚举
+enum class AgentStepType {
+    THOUGHT,       // AI 思考过程
+    TOOL_CALL,     // 调用工具
+    TOOL_RESULT,   // 工具返回结果
+    OBSERVATION    // AI 对结果的观察
+}
+
+// domain/model/ToolDefinition.kt — 新增
+data class ToolDefinition(
+    val name: String,              // web_search, calculator
+    val description: String,       // 功能描述
+    val parameters: Map<String, Any>  // JSON Schema 参数定义
+)
+```
+
+#### 13.4.2 SSE 流新增字段解析
+
+现有 Android 端 `ChatStreamApi` 只提取 `delta.content`。v2.0 需要同时解析 `delta.tool_calls`：
+
+```text
+SSE chunk (新增字段示例):
+data: {
+  "id": "chatcmpl-xxx",
+  "choices": [{
+    "index": 0,
+    "delta": {
+      "content": null,
+      "tool_calls": [{
+        "index": 0,
+        "id": "call_xxx",
+        "type": "function",
+        "function": {
+          "name": "web_search",
+          "arguments": "{\"query\":\"2026年高考数学大纲\"}"
+        }
+      }]
+    }
+  }]
+}
+```
+
+**客户端解析逻辑（ChatCompletionChunk 扩展）：**
+
+```text
+SSE line → JSON parse → ChatCompletionChunkV2
+  ├── choices[0].delta.content != null → 正常流式文本
+  └── choices[0].delta.tool_calls != null → 工具调用指令
+       ├── 发送 AgentStep(TOOL_CALL) 消息
+       ├── ToolExecEngine 执行工具
+       ├── 工具完成后：
+       │   ├── 发送 AgentStep(TOOL_RESULT) 消息
+       │   └── 构建 tool_result 消息体，通过新 SSE 连接发送回 LLM
+       └── 等待新 SSE 流读取 RESPONDING 内容
+```
+
+### 13.5 工具注册与执行框架
+
+**ToolRegistry** — 管理所有可用工具的定义和处理器。
+
+| 工具名称 | 描述 | 执行方式 | 依赖 |
+|---------|------|---------|------|
+| `web_search` | 联网搜索实时信息 | HTTP GET → 搜索引擎API (Serper/SearXNG) | 需要 API Key |
+| `calculator` | 数学计算 | 本地表达式求值 (exp4j / eval) | 无网络依赖 |
+| `datetime` | 获取当前日期时间 | 本地 kotlinx.datetime | 无网络依赖 |
+
+**工具注册流程：**
+
+```text
+应用启动
+  │
+  ▼
+ToolRegistry.init()
+  ├── register(WebSearchTool)   // 需要网络权限
+  ├── register(CalculatorTool)  // 纯本地
+  └── register(DateTimeTool)    // 纯本地
+
+发送请求时（Agent模式开启）：
+  ChatCompletionRequest.tools = ToolRegistry.getAllToolDefinitions()
+  → 序列化为 OpenAI tools 参数格式，传给 new-api
+```
+
+### 13.6 前端组件树
+
+```text
+ChatScreen (改造)
+  ├── AgentSwitch (新)              // Agent 模式开关
+  ├── MessageList
+  │   ├── MessageBubble (改造)
+  │   │   └── AgentThoughtBubble (新)  // 思考过程可视化
+  │   │       ├── ThoughtCard          // 「思考」步骤卡片，灰底
+  │   │       ├── SearchCard           // 「搜索中...」旋转图标 + 查询词
+  │   │       └── ObservationCard      // 「观察到...」推理过程
+  │   ├── TextMessage                 // 原有文本消息
+  │   └── ImageMessage                // 原有图片消息
+  ├── InputBar
+  │   └── AgentStatusIndicator (新)   // 当前 Agent 状态提示
+  └── VoiceInputBar (原有)
+```
+
+### 13.7 数据流：带 Tool Calling 的完整对话
+
+```text
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Android Client                                                          │
+│                                                                          │
+│  ① 用户输入 "今天有什么AI新闻？"                                          │
+│     (Agent开关 = ON)                                                     │
+│       │                                                                  │
+│       ▼                                                                  │
+│  ② ChatViewModel.sendMessage()                                          │
+│     ├─ 保存用户消息到 Room                                               │
+│     ├─ 创建 AI 消息占位符 (contentType=AGENT_STEP)                        │
+│     └─ 调用 streamChat() 带 tools 参数                                   │
+│       │                                                                  │
+│       ▼                                                                  │
+│  ③ ChatRepositoryImpl.streamChat()                                      │
+│     └─ ChatCompletionRequest {                                           │
+│           model: "...",                                                  │
+│           messages: [...],                                               │
+│           tools: [                                                       │
+│             {"type":"function", "function":{"name":"web_search",...}},   │
+│             {"type":"function", "function":{"name":"calculator",...}}    │
+│           ],                                                             │
+│           stream: true                                                   │
+│         }                                                               │
+│       │                                                                  │
+│       ▼                                                                  │
+│  ④ Client SSE 解析 (改造 ChatStreamApi)                                  │
+│                                                                          │
+│     SSE Event 序列:                                                     │
+│     ─────────────────────────────────────────────────────────────────    │
+│     [1] data: {"choices":[{"delta":{"content":"","role":"assistant"}}]} │
+│         → AgentStateMachine: IDLE → THINKING                            │
+│     [2] data: {"choices":[{"delta":{"content":"让我帮你查一下..."}}]}    │
+│         → 正常流式文本 (THINKING 阶段)                                    │
+│     [3] data: {"choices":[{"delta":{                                     │
+│           "tool_calls":[{"function":{"name":"web_search",                │
+│           "arguments":"{\"query\":\"2026年AI新闻\"}"}}]                   │
+│         }}]}                                                             │
+│         → AgentStateMachine: THINKING → SEARCHING                        │
+│         → 发送 AgentStep(TOOL_CALL) 到消息列表                            │
+│     [4] [ToolExecEngine 执行 web_search]                                 │
+│         ├─ HTTP GET → Serper/SearXNG API                                │
+│         └─ 结果: [{"title":"...", "snippet":"..."}, ...]                │
+│     [5] AgentStateMachine: SEARCHING → REASONING                         │
+│         → 发送 AgentStep(TOOL_RESULT) 到消息列表                          │
+│         → 新建 SSE 连接发送 tool_result 给 LLM                            │
+│     [6] data: {"choices":[{"delta":{"content":"根据搜索结果..."}}]}      │
+│         → AgentStateMachine: REASONING → RESPONDING                      │
+│         → 流式输出最终回答                                                │
+│     [7] data: [DONE]                                                     │
+│         → AgentStateMachine: RESPONDING → IDLE                           │
+│     ─────────────────────────────────────────────────────────────────    │
+│                                                                          │
+│  ⑤ ChatViewModel 更新 ChatUiState                                       │
+│     ├─ uiState.agentState = IDLE/THINKING/SEARCHING/...                 │
+│     ├─ uiState.streamingContent = 当前流式文本                           │
+│     └─ uiState.messages += AgentStep 消息                                 │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### 13.8 关键类图
+
+```text
+┌──────────────────────────────────────────┐
+│ ChatViewModel (改造)                      │
+│  ├─ agentState: MutableState<AgentState>  │
+│  ├─ agentEnabled: MutableState<Boolean>   │
+│  ├─ toggleAgentMode()                     │
+│  └─ handleToolCallChunk()                 │
+├──────────────────────────────────────────┤
+│ AgentStateMachine                         │
+│  ├─ currentState: AgentState              │
+│  ├─ transition(event: AgentEvent)         │
+│  └─ onToolCall(): suspend → ToolResult    │
+├──────────────────────────────────────────┤
+│ ToolRegistry (单例)                        │
+│  ├─ registeredTools: Map<String,Tool>     │
+│  ├─ register(tool: Tool)                  │
+│  ├─ getToolDefinitions(): List<...>       │
+│  └─ execute(name, args): ToolResult       │
+├──────────────────────────────────────────┤
+│ Tool (interface)                          │
+│  ├─ name: String                          │
+│  ├─ description: String                   │
+│  ├─ parameters: JsonSchema                │
+│  └─ suspend fun execute(args): ToolResult │
+├──────────────────────────────────────────┤
+│ WebSearchTool : Tool                      │
+│  ├─ client: OkHttpClient                  │
+│  └─ execute() → 搜索结果 JSON              │
+├──────────────────────────────────────────┤
+│ CalculatorTool : Tool                     │
+│  └─ execute() → 计算结果 Double            │
+├──────────────────────────────────────────┤
+│ ChatStreamApi (改造)                       │
+│  └─ streamChat() → Flow<StreamEvent>      │
+│     (新增: 解析 tool_calls 字段)           │
+├──────────────────────────────────────────┤
+│ StreamEvent (密封类, 新增)                  │
+│  ├─ TextChunk(content) : StreamEvent      │
+│  ├─ ToolCallChunk(calls) : StreamEvent    │
+│  ├─ RoleChunk(role) : StreamEvent         │
+│  └─ Done : StreamEvent                   │
+└──────────────────────────────────────────┘
+```
+
+### 13.9 后端修改方案
+
+**后端改造成本极低**，因为 new-api 原生支持 tool calling。现有 `chat_completions.py` 只需：
+
+1. **请求转发增加 tools 参数**：如果请求体包含 `tools` 字段，透传给 new-api
+2. **SSE 透传 tool_calls**：不对 tool_calls 相关字段做特殊处理，原样转发给客户端
+3. **输出安全过滤忽略工具字段**：对 `tool_calls` 中的 `arguments` 暂不进行关键词过滤（JSON 参数内容可能被误杀）
+
+```text
+chat_completions.py payload 构建（修改点）:
+  payload = {
+      "model": req.model,
+      "messages": [...],
+      "stream": is_stream,
+      "temperature": ...,
+  }
+  + if req.tools:  // 新增
+  +     payload["tools"] = [t.model_dump() for t in req.tools]
+  + if req.tool_choice:
+  +     payload["tool_choice"] = req.tool_choice
+```
+
+**POST /v1/chat/completions 请求体扩展（可选）:**
+
+```text
+// 新增字段（现有的 ChatCompletionRequest schema）
+tools?: ToolDefinition[]    // 工具定义列表
+tool_choice?: "auto" | "none" | {"type": "function", "function": {"name": "..."}}
+```
+
+**第二次 SSE 连接（工具结果回传）流程：**
+
+```text
+客户端工具执行完成后：
+  → 构建新 SSE 请求 (无需新建 API，复用同一 POST /v1/chat/completions)
+  → messages 追加:
+      原有的 user 消息
+      + assistant 消息 (含 tool_calls)
+      + tool 消息:
+          role: "tool"
+          content: "搜索结果 JSON"
+          tool_call_id: "call_xxx"
+  → stream = true
+  → 新的 SSE 流：AI 基于工具结果生成最终回答
+```
+
+### 13.10 风险点与边界情况
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| 工具执行超时 | Agent 卡在 SEARCHING | 设置 15s 超时，超时后降级为非 Agent 模式回复 |
+| 网络搜索无结果 | Agent 无法获取信息 | 返回"未找到相关信息" + 降级到模型固有知识 |
+| 多轮工具调用 | 状态机复杂度上升 | 限制最多 3 轮工具调用，超出后强制结束 |
+| 后端透传兼容性 | 旧版 new-api 不支持 tool calling | Agent 模式需要后端版本 >= 某版本，否则降级 |
+| 配额消耗翻倍 | 工具调用可能触发多次 LLM | 工具执行后回传不额外扣配额 |
+| SSE 解析兼容 | 解析 tool_calls 字段可能抛异常 | StreamEvent 密封类，解析失败降级为 TextChunk |
+
+### 13.11 新增文件清单
+
+| 文件路径 | 说明 |
+|---------|------|
+| `domain/model/AgentState.kt` | Agent 状态枚举 + 状态机定义 |
+| `domain/model/AgentStepType.kt` | Agent 步骤类型枚举 |
+| `domain/model/ToolDefinition.kt` | 工具定义数据类 |
+| `domain/model/StreamEvent.kt` | SSE 流事件密封类 |
+| `domain/repository/AgentRepository.kt` | Agent 模块仓库接口 |
+| `data/remote/api/ToolStreamApi.kt` | 带工具参数的流式 API（扩展 ChatStreamApi） |
+| `data/remote/dto/ToolDto.kt` | 工具相关 DTO（ToolCallChunkDto 等） |
+| `data/repository/AgentRepositoryImpl.kt` | Agent 仓库实现 |
+| `data/tool/registry/ToolRegistry.kt` | 工具注册中心 |
+| `data/tool/engine/ToolExecEngine.kt` | 工具执行引擎 |
+| `data/tool/impl/WebSearchTool.kt` | 联网搜索工具 |
+| `data/tool/impl/CalculatorTool.kt` | 计算器工具 |
+| `data/tool/impl/DateTimeTool.kt` | 日期时间工具 |
+| `ui/chat/components/AgentSwitch.kt` | Agent 模式切换开关 |
+| `ui/chat/components/AgentThoughtBubble.kt` | 思考过程气泡组件 |
+| `ui/chat/components/AgentStatusIndicator.kt` | Agent 状态指示器 |
+| `ui/chat/AgentUiState.kt` | Agent UI 状态 |
+
+### 13.12 修改文件清单
+
+| 文件路径 | 修改内容 |
+|---------|---------|
+| `domain/model/ChatMessage.kt` | 新增 agentStepType/toolName/toolQuery/toolResult 字段 |
+| `data/remote/api/ChatStreamApi.kt` | 解析 tool_calls 字段 + 新增 StreamEvent 返回 |
+| `data/remote/dto/ChatDtos.kt` | 新增工具相关 DTO（如 ChatCompletionChunk 扩展 tool_calls） |
+| `data/repository/ChatRepositoryImpl.kt` | streamChat 支持 tools 参数透传 |
+| `domain/repository/ChatRepository.kt` | streamChat 接口增加 tools 参数 |
+| `ui/chat/ChatViewModel.kt` | 集成 AgentStateMachine，处理工具调用周期 |
+| `ui/chat/ChatUiState.kt` | 新增 agentState/agentEnabled 字段 |
+| `ui/chat/ChatScreen.kt` | 集成 AgentSwitch，条件渲染 AgentThoughtBubble |
+| `ui/chat/components/MessageBubble.kt` | 新增 AGENT_STEP 类型分支渲染 |
+| `ui/settings/SettingsScreen.kt` | 新增 Agent 模式默认开关设置 |
+
+---
+
+## 14. 学习报告 PDF 导出模块 (F49)
+
+> 版本：v2.0 新增 | 优先级：P0 | 依赖：Room 数据库统计数据
+
+### 14.1 概述
+
+从 Room 本地数据库聚合学习统计数据，使用 Android 原生 `android.graphics.pdf.PdfDocument` API 生成 PDF，并通过系统分享面板导出。
+
+技术选型理由：
+- **Android PdfDocument**：原生 API，无额外依赖，Canvas 驱动的渲染方式适合自定义排版
+- 不需要 iText 等第三方库（增加 APK 大小，需处理开源协议兼容性）
+- 分享使用 `Intent.ACTION_SEND` + `FileProvider`
+
+### 14.2 三层架构
+
+```text
+┌───────────────────────────────────────────────┐
+│  Share Layer                                   │
+│  ShareStudyReportUseCase                       │
+│  ├─ 生成 PDF 到 cache/study_report/            │
+│  └─ 启动 Intent.ACTION_SEND (FileProvider URI) │
+├───────────────────────────────────────────────┤
+│  PDF Render Layer                              │
+│  PdfReportRenderer                             │
+│  ├─ Page 1: 封面 (头像 + 昵称 + 报告日期)      │
+│  ├─ Page 2: 学习概览 (总学习天数/总对话/今日)   │
+│  ├─ Page 3: 学科分布饼图 (SVG→Canvas 绘制)     │
+│  ├─ Page 4: 学习趋势 (近 7 天对话数柱状图)      │
+│  └─ Page 5: 成就展示 (连胜天数/徽章)            │
+│  (Canvas API 绘制，文本+图形+颜色)              │
+├───────────────────────────────────────────────┤
+│  Data Aggregation Layer                        │
+│  StudyReportRepository                        │
+│  ├─ Room DAO 查询:                            │
+│  │   ├─ 总对话数 / 总消息数                    │
+│  │   ├─ 每日学习统计 (近 7/30 天)              │
+│  │   ├─ 学科分布 (按 content/空值)             │
+│  │   ├─ 活跃天数 / 连胜数                      │
+│  │   └─ 首次使用日期                           │
+│  └─ StudyReportData (聚合模型)                 │
+└───────────────────────────────────────────────┘
+```
+
+### 14.3 Room 数据查询设计
+
+所有统计从本地 Room 数据库的 `messages` 和 `conversations` 表聚合：
+
+```text
+// DAO 查询方法 (新增)
+StudyReportDao:
+
+📊 总览统计
+  SELECT COUNT(DISTINCT date(timestamp/1000, 'unixepoch')) as totalActiveDays,
+         COUNT(*) as totalMessages,
+         (SELECT COUNT(*) FROM messages WHERE date(timestamp/1000, 'unixepoch') = date('now')) as todayMessages,
+         MIN(date(timestamp/1000, 'unixepoch')) as firstUseDate
+  FROM messages
+
+📈 近 7 天每日学习趋势
+  SELECT date(timestamp/1000, 'unixepoch') as day,
+         COUNT(*) as msgCount,
+         COUNT(DISTINCT conversationId) as convCount
+  FROM messages
+  WHERE date(timestamp/1000, 'unixepoch') >= date('now', '-7 days')
+  GROUP BY day ORDER BY day ASC
+
+🏆 连胜天数
+  (通过应用层遍历活跃日期，计算最长连续活跃天数)
+
+📚 对话主题分布
+  SELECT title, messageCount FROM conversations
+  WHERE title != '' ORDER BY updatedAt DESC LIMIT 20
+
+⏱ 平均回复长度
+  SELECT AVG(LENGTH(content)) as avgLength FROM messages WHERE isUser = 0
+```
+
+### 14.4 PDF 渲染设计
+
+**PdfReportRenderer** 使用 `android.graphics.pdf.PdfDocument` 逐页 Canvas 绘制：
+
+```text
+PdfDocument (A4: 595×842 pt)
+  ├─ Page 1 — 封面页
+  │   ├─ 应用图标 (Bitmap)
+  │   ├─ 标题: "AI 学伴 - 学习报告"
+  │   ├─ 用户昵称
+  │   └─ 报告生成日期
+  │
+  ├─ Page 2 — 学习概览
+  │   ├─ 卡片: 总活跃天数 / 总对话数 / 今日学习
+  │   ├─ 卡片: 最长连胜 / 累计学习时长(估计)
+  │   └─ 装饰性分隔线
+  │
+  ├─ Page 3 — 学习趋势 (柱状图)
+  │   ├─ 标题: "近 7 天学习趋势"
+  │   ├─ X 轴: 日期标签
+  │   ├─ Y 轴: 对话次数
+  │   └─ Paint.rect 柱状图
+  │
+  └─ Page 4 — 成就 & 统计摘要
+      ├─ 获得的徽章列表
+      ├─ 学习之星评价 (根据数据生成评语)
+      └─ 页脚: "由 AI 学伴 App 生成"
+```
+
+### 14.5 关键类图
+
+```text
+┌───────────────────────────────────────┐
+│ StudyReportRepository                 │
+│  ├─ fun getReportData(): ReportData   │
+│  └─ 依赖: ConversationDao, MessageDao │
+├───────────────────────────────────────┤
+│ ReportData                            │
+│  ├─ totalActiveDays: Int              │
+│  ├─ totalMessages: Int                │
+│  ├─ totalConversations: Int           │
+│  ├─ todayMessages: Int                │
+│  ├─ dailyStats: List<DayStat>         │
+│  ├─ streakDays: Int                   │
+│  ├─ avgResponseLength: Int            │
+│  └─ firstUseDate: String              │
+├───────────────────────────────────────┤
+│ PdfReportRenderer                     │
+│  ├─ render(reportData): PdfDocument   │
+│  ├─ drawCoverPage(canvas, ...)        │
+│  ├─ drawOverviewPage(canvas, ...)     │
+│  ├─ drawTrendChart(canvas, ...)       │
+│  └─ drawAchievementsPage(canvas, ...) │
+├───────────────────────────────────────┤
+│ ShareStudyReportUseCase               │
+│  ├─ invoke(): Uri                     │
+│  ├─ generatePdf(): File               │
+│  └─ createShareIntent(): Intent       │
+└───────────────────────────────────────┘
+```
+
+### 14.6 分享流程
+
+```text
+用户点击"导出学习报告"
+       │
+       ▼
+ShareStudyReportUseCase.invoke()
+       │
+       ├─ 1. ReportRepository.getReportData()
+       │      └─ Room DAO 并发聚合数据
+       │
+       ├─ 2. PdfReportRenderer.render(reportData)
+       │      ├─ 创建 PdfDocument
+       │      ├─ 逐页 Canvas.draw...
+       │      └─ document.writeTo(outputStream)
+       │
+       ├─ 3. 保存到 app cache/study_report/report_20260516.pdf
+       │
+       ├─ 4. FileProvider.getUriForFile()
+       │
+       └─ 5. Intent.ACTION_SEND
+              ├─ type: "application/pdf"
+              ├─ EXTRA_STREAM: content URI
+              ├─ 添加 FLAG_GRANT_READ_URI_PERMISSION
+              └─ startActivity(Intent.createChooser(...))
+```
+
+### 14.7 新增文件清单
+
+| 文件路径 | 说明 |
+|---------|------|
+| `domain/model/ReportData.kt` | 学习报告聚合数据模型 |
+| `domain/usecase/ShareStudyReportUseCase.kt` | 导出并分享报告的业务用例 |
+| `domain/repository/StudyReportRepository.kt` | 报告数据仓库接口 |
+| `data/local/dao/StudyReportDao.kt` | 统计查询 DAO |
+| `data/repository/StudyReportRepositoryImpl.kt` | 报告数据仓库实现 |
+| `ui/report/PdfReportRenderer.kt` | PDF 渲染引擎（Canvas 绘制） |
+| `ui/report/ReportExportScreen.kt` | 报告预览/导出界面 |
+| `ui/report/ReportExportViewModel.kt` | 导出 ViewModel |
+| `xml/file_paths.xml` | FileProvider 路径配置 |
+| `AndroidManifest.xml` | 注册 FileProvider + 声明权限 |
+
+### 14.8 修改文件清单
+
+| 文件路径 | 修改内容 |
+|---------|---------|
+| `data/local/db/AiTutorDatabase.kt` | 注册 StudyReportDao |
+| `di/DatabaseModule.kt` | 注入 StudyReportDao |
+| `ui/settings/SettingsScreen.kt` | 添加"导出学习报告"入口 |
+| `app/build.gradle.kts` | 无新增依赖（PdfDocument 为平台 API） |
+| `AndroidManifest.xml` | 注册 FileProvider |
+
+### 14.9 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| PDF 内容中文渲染 | 文字乱码或不显示 | 使用 Typeface.create("sans-serif", Normal) 确保支持中文字符 |
+| 大数据量渲染 | OOM | 限制查询范围（最多 30 天），PDF 页数不超过 10 页 |
+| FileProvider URI 权限 | 部分 App 无法接收 | 使用 FileProvider + 临时授权，兼容主流分享目标 |
+| Room 统计查询性能 | 主线程卡顿 | 统计查询全部使用 suspend 协程，Room 自动在后台线程执行 |
+
+---
+
+## 15. 多语言支持 (F50)
+
+> 版本：v2.0 新增 | 优先级：P1 | 初始目标：中文 + 英文
+
+### 15.1 概述
+
+为 App 添加英文界面支持，使用 Android 标准 `strings.xml` 资源文件方案 + Compose 响应式语言切换。
+
+技术方案：
+- **Android 原生国际化**（`values/` + `values-en/` 资源目录）
+- **Compose 响应式切换**：通过 `CompositionLocal` 观察 `AppLanguage` 状态
+- **DataStore 持久化**：保存用户的语言偏好
+- **后端语言参数**：请求头 `Accept-Language` 或请求体 `language` 字段控制 AI 回复语言
+
+### 15.2 资源文件组织
+
+```text
+res/
+  ├── values/                          (默认，中文)
+  │   ├── strings.xml
+  │   └── strings_chat.xml            (会话相关文案，按功能拆分)
+  │
+  ├── values-en/                       (英文)
+  │   ├── strings.xml
+  │   └── strings_chat.xml
+  │
+  └── values-ja/                       (日文，可选)
+      ├── strings.xml
+      └── strings_chat.xml
+```
+
+**strings.xml** 迁移计划：将所有硬编码中文字符串迁移到 `strings.xml`，按功能分组：
+
+```text
+<!-- 通用 -->
+<string name="app_name">AI 学伴</string>
+<string name="app_name_en">AI Tutor</string>
+
+<!-- 导航 -->
+<string name="nav_chat">对话</string>
+<string name="nav_chat_en">Chat</string>
+<string name="nav_dashboard">学习</string>
+<string name="nav_dashboard_en">Dashboard</string>
+<string name="nav_profile">我的</string>
+<string name="nav_profile_en">Profile</string>
+
+<!-- 聊天 -->
+<string name="input_hint">输入你的问题...</string>
+<string name="input_hint_en">Ask me anything...</string>
+<string name="send">发送</string>
+<string name="send_en">Send</string>
+
+<!-- Agent -->
+<string name="agent_mode">AI Agent</string>
+<string name="agent_mode_en">AI Agent</string>
+<string name="agent_thinking">AI 正在思考...</string>
+<string name="agent_thinking_en">AI is thinking...</string>
+<string name="agent_searching">正在搜索：%s</string>
+<string name="agent_searching_en">Searching: %s</string>
+
+<!-- 设置 -->
+<string name="settings_language">语言</string>
+<string name="settings_language_en">Language</string>
+<string name="language_zh">中文</string>
+<string name="language_en">English</string>
+```
+
+### 15.3 语言切换架构
+
+```text
+┌──────────────────────────────────────┐
+│ AppLanguageState (DataStore 持久化)   │
+│  ├─ currentLang: MutableStateFlow    │
+│  │   = Locale("zh") / Locale("en")  │
+│  ├─ setLanguage(locale)              │
+│  └─ flow: Flow<Locale>               │
+├──────────────────────────────────────┤
+│ 提供层                                │
+│  AppLanguageProvider (CompositionLocal)│
+│  ├─ 读取 DataStore 中的语言设置        │
+│  └─ 通过 CompositionLocal 分发         │
+├──────────────────────────────────────┤
+│ 使用层                                │
+│  Compose 组件通过 stringResource()    │
+│  或 LocalAppLanguage.current 获取     │
+└──────────────────────────────────────┘
+```
+
+**DataStore 存储结构：**
+
+```text
+// data/remote/datastore/LanguagePreferences.kt (新增)
+language_preferences {
+  "app_language" : "zh" | "en" | "ja"  // DataStore Preferences
+}
+```
+
+**CompositionLocal 实现：**
+
+```kotlin
+// AppLanguageProvider.kt (新增)
+val LocalAppLanguage = staticCompositionLocalOf { Locale("zh") }
+
+@Composable
+fun AppLanguageProvider(
+    languagePreferences: LanguagePreferences,
+    content: @Composable () -> Unit
+) {
+    val locale by languagePreferences.currentLocale.collectAsState()
+    CompositionLocalProvider(LocalAppLanguage provides locale) {
+        // 更新 Configuration.locale
+        val config = LocalConfiguration.current
+        config.setLocale(locale)
+        // 需要 context.createConfigurationContext 刷新资源
+        content()
+    }
+}
+```
+
+**语言切换流程：**
+
+```text
+用户选择 "English"
+       │
+       ▼
+SettingsViewModel.setLanguage("en")
+       │
+       ├─ 1. LanguagePreferences.setLocale(Locale("en"))
+       │      └─ DataStore 保存
+       │
+       ├─ 2. AppLanguageProvider 感知到 StateFlow 变化
+       │      └─ CompositionLocal 更新
+       │
+       ├─ 3. MainActivity recomposition
+       │      ├─ createConfigurationContext(Configuration(Locale("en")))
+       │      └─ setContentView 重新 inflate
+       │
+       └─ 4. 所有 stringResource() 自动返回英文文案
+```
+
+### 15.4 后端语言参数传递
+
+对于 AI 回复的语言控制，通过 `ChatCompletionRequest` 增加 `language` 字段：
+
+```text
+// Android → Backend
+POST /v1/chat/completions
+{
+  "model": "...",
+  "messages": [...],
+  "stream": true,
+  "language": "zh" | "en",   // 新增字段
+  ...
+}
+
+// Backend → new-api (system prompt 尾部追加指令)
+messages = [
+  {"role": "system", "content": "... \n\n请用英文回答。"},  // language=en 时
+  ...
+]
+```
+
+或者更简单的方案：客户端在消息列表中自动插入一条语言指令：
+
+```text
+// Android 在 streamChat 时对 messages 做前置处理
+if (language == "en" && hasSystemPrompt) {
+    messages.add(
+        ChatMessageDto(role="system", content="Please answer in English.")
+    )
+}
+```
+
+推荐方案：**后端处理**。在 `chat_completions.py` 中接收 `language` 参数，自动注入 system prompt：
+
+```text
+POST /v1/chat/completions (增设字段)
+  language?: "zh" | "en"    // 默认 "zh"
+
+后端处理逻辑：
+  1. 从请求体读取 language 字段
+  2. 如果 language == "en":
+     在 system message 中追加 "Please always answer in English."
+  3. 仅影响 AI 回复语言，不影响 UI
+
+后端架构变更极小：
+  → 新增 chat_completions.py 中的处理分支即可
+  → 无需数据库变更
+  → 无需新增路由
+```
+
+### 15.5 UI 组件适配方案
+
+| 组件类型 | 适配方式 | 示例 |
+|---------|---------|------|
+| 静态文本 | `stringResource(R.string.xxx)` | Text(text = stringResource(R.string.send)) |
+| 动态文本 | 参数化字符串 | stringResource(R.string.agent_searching, query) |
+| 用户生成内容 | 不翻译（消息内容） | 直接显示 |
+| 日期/时间 | `java.time.format` 本地化 | DateTimeFormatter.ofLocalizedDate() |
+| AI 回复 | 后端 language 参数 | 后端自动切换语言 |
+| Toast/Snackbar | 同字符串资源 | stringResource(R.string.error_network) |
+| 图标 alt 文本 | contentDescription 绑定 | contentDescription = stringResource(...) |
+
+### 15.6 关键类图
+
+```text
+┌──────────────────────────────────────┐
+│ LanguagePreferences                   │
+│  ├─ currentLocale: Flow<Locale>      │
+│  ├─ suspend setLocale(locale)        │
+│  └─ (DataStore Preferences 实现)      │
+├──────────────────────────────────────┤
+│ AppLanguageProvider (Composable)      │
+│  ├─ 读取 LanguagePreferences         │
+│  └─ CompositionLocal 分发 locale     │
+├──────────────────────────────────────┤
+│ LocalAppLanguage (CompositionLocal)   │
+├──────────────────────────────────────┤
+│ LanguageSettingUseCase               │
+│  ├─ getCurrentLanguage(): Locale     │
+│  └─ setLanguage(locale)              │
+├──────────────────────────────────────┤
+│ SettingsViewModel (改造)              │
+│  └─ availableLanguages: List<Locale> │
+└──────────────────────────────────────┘
+```
+
+### 15.7 新增文件清单
+
+| 文件路径 | 说明 |
+|---------|------|
+| `data/remote/datastore/LanguagePreferences.kt` | 语言偏好 DataStore |
+| `ui/theme/AppLanguageProvider.kt` | Language CompositionLocal Provider |
+| `res/values/strings.xml` | 默认中文资源（重构现有硬编码字符串） |
+| `res/values-en/strings.xml` | 英文资源翻译 |
+| `res/values-ja/strings.xml` | 日文资源（可选） |
+
+### 15.8 修改文件清单
+
+| 文件路径 | 修改内容 |
+|---------|---------|
+| `MainActivity.kt` | 包裹 AppLanguageProvider，监听语言变化重建 Context |
+| `ui/settings/SettingsScreen.kt` | 新增语言选择列表 |
+| `ui/settings/SettingsViewModel.kt` | 集成 LanguagePreferences |
+| `ui/chat/ChatViewModel.kt` | streamChat 增加 language 参数 |
+| `domain/repository/ChatRepository.kt` | streamChat 增加 language 参数 |
+| `data/repository/ChatRepositoryImpl.kt` | 请求体传递 language 字段 |
+| `data/remote/dto/ChatDtos.kt` | ChatCompletionRequest 增加 language 字段 |
+| `ui/**/*.kt` | 所有硬编码中文字符串替换为 stringResource() |
+| `app/build.gradle.kts` | 无新增依赖（国际化无需额外库） |
+| 后端 `chat_completions.py` | 新增 language 字段处理逻辑 |
+| 后端 `schemas/chat_completions.py` | ChatCompletionRequest 增加 language 字段 |
+
+### 15.9 风险点
+
+| 风险 | 影响 | 缓解措施 |
+|------|------|---------|
+| AI 回复语言不跟随 UI | 用户期望英文 AI 输出中文 | 后端 system prompt 注入语言指令，同时增加 `always` 限定词 |
+| 动态字符串参数顺序变化 | 不同语言的语序不同 | 使用 `%1$s`, `%2$d` 位置参数，避免硬编码顺序 |
+| 字符串遗漏 | 部分文本仍为中文 | 编写 lint 规则检查未国际化的字符串，配合 PR review |
+| Compose 预览不刷新 | 开发体验下降 | 在 Preview 中手动指定 locale |
+| 配置变更时状态保持 | 语言设置丢失 | DataStore 持久化，AppLanguageProvider 在 onCreate 时恢复 |
+
+---
+
+## 附录 C: v2.0 新增文件清单 (F48-F50)
+
+### AI Agent 模块 (F48)
+
+| 文件路径 | 说明 |
+|---------|------|
+| `domain/model/AgentState.kt` | Agent 状态机定义 |
+| `domain/model/AgentStepType.kt` | Agent 步骤类型枚举 |
+| `domain/model/ToolDefinition.kt` | 工具定义模型 |
+| `domain/model/StreamEvent.kt` | SSE 流事件密封类 |
+| `domain/repository/AgentRepository.kt` | Agent 仓库接口 |
+| `data/remote/dto/ToolDto.kt` | 工具相关 DTO |
+| `data/repository/AgentRepositoryImpl.kt` | Agent 仓库实现 |
+| `data/tool/registry/ToolRegistry.kt` | 工具注册中心 |
+| `data/tool/engine/ToolExecEngine.kt` | 工具执行引擎 |
+| `data/tool/impl/WebSearchTool.kt` | 联网搜索工具 |
+| `data/tool/impl/CalculatorTool.kt` | 计算器工具 |
+| `data/tool/impl/DateTimeTool.kt` | 日期时间工具 |
+| `ui/chat/components/AgentSwitch.kt` | Agent 模式开关按钮 |
+| `ui/chat/components/AgentThoughtBubble.kt` | 思考过程展示组件 |
+| `ui/chat/components/AgentStatusIndicator.kt` | 状态指示器组件 |
+| `ui/chat/AgentUiState.kt` | Agent UI 状态类 |
+
+### 学习报告 PDF 模块 (F49)
+
+| 文件路径 | 说明 |
+|---------|------|
+| `domain/model/ReportData.kt` | 报告聚合数据模型 |
+| `domain/usecase/ShareStudyReportUseCase.kt` | 分享报告用例 |
+| `domain/repository/StudyReportRepository.kt` | 报告仓库接口 |
+| `data/local/dao/StudyReportDao.kt` | 统计查询 DAO |
+| `data/repository/StudyReportRepositoryImpl.kt` | 报告仓库实现 |
+| `ui/report/PdfReportRenderer.kt` | PDF 渲染引擎 |
+| `ui/report/ReportExportScreen.kt` | 报告导出界面 |
+| `ui/report/ReportExportViewModel.kt` | 导出 ViewModel |
+| `xml/file_paths.xml` | FileProvider 路径配置 |
+
+### 多语言模块 (F50)
+
+| 文件路径 | 说明 |
+|---------|------|
+| `data/remote/datastore/LanguagePreferences.kt` | 语言偏好 DataStore |
+| `ui/theme/AppLanguageProvider.kt` | 语言 CompositionLocal Provider |
+| `res/values/strings.xml` | 中文资源（重构为完整国际化的 strings） |
+| `res/values-en/strings.xml` | 英文资源 |
+
+## 附录 D: v2.0 模块依赖关系总图
+
+```text
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  v2.0 架构扩展：F48(Agent) + F49(报告) + F50(多语言)                        │
+│                                                                             │
+│  现有 v1.0 架构：Clean Architecture + MVVM + F40-F46                        │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  Sprint 1 (P0): 独立可并行开发                                         │   │
+│  │                                                                        │   │
+│  │  ┌──────────────────────┐ ┌────────────────┐ ┌──────────────────┐     │   │
+│  │  │ F48 — AI Agent 增强  │ │ F49 — 学习报告   │ │ F50 — 多语言     │     │   │
+│  │  │ 依赖: F42(Chat SSE)  │ │ PDF 导出         │ │ 依赖: 现有 UI   │     │   │
+│  │  │       + 后端 new-api │ │ 依赖: Room DB +  │ │       + Dto     │     │   │
+│  │  │       + F24(消息)   │ │       DataStore  │ │                  │     │   │
+│  │  │ 产出:               │ │ 产出:            │ │ 产出:            │     │   │
+│  │  │  AgentStateMachine  │ │  ReportRepo      │ │  strings.xml    │     │   │
+│  │  │  ToolRegistry       │ │  PdfRenderer     │ │  en/ja 翻译     │     │   │
+│  │  │  AgentThoughtBubble │ │  ShareUseCase    │ │  LanguagePref   │     │   │
+│  │  │  StreamEvent解析    │ │                  │ │  AppLangProvider│     │   │
+│  │  └──────────────────────┘ └────────────────┘ └──────────────────┘     │   │
+│  │                                                                        │   │
+│  │  并行策略: F48/F49/F50 无互依赖 → 3 人并行开发                         │   │
+│  │  F48 需后端配合（极小改动：透传 tools + language 参数）                 │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐   │
+│  │  Sprint 2 (整合 & QA):                                                │   │
+│  │                                                                        │   │
+│  │  ├─ F48 + F50 后端联合调试（language 参数 + tools 参数透传）           │   │
+│  │  ├─ F49 多语言报告文案适配                                               │   │
+│  │  ├─ F48 Agent 模式/普通模式切换测试                                      │   │
+│  │  └─ F50 全部 UI 组件语言切换回归测试                                     │   │
+│  └──────────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 与现有架构兼容性分析
+
+| 维度 | v1.0 架构 | v2.0 变更 | 兼容性 |
+|------|-----------|-----------|--------|
+| Clean Architecture | 3 层（ui/data/domain） | 不变 | ✅ 完全兼容 |
+| MVVM + Compose | ChatViewModel + ChatUiState | 新增 AgentUiState + AgentStateMachine | ✅ 增量扩展 |
+| SSE 流式通道 | ChatStreamApi → Flow\<String\> | 升级为 Flow\<StreamEvent\>（密封类） | ⚠️ 需修改解析层 |
+| ChatMessage 模型 | 5 字段 | 扩展 4 个 Agent 字段（均为 nullable） | ✅ 不影响现有序列化 |
+| Room 数据库 | Conversation + Message | 新增 StudyReportDao（只读查询） | ✅ 完全兼容 |
+| Hilt DI | NetworkModule + DatabaseModule | 新增 AgentModule + ReportModule | ✅ 增量注入 |
+| OkHttp SSE | EventSource API | 兼容（仅扩展解析逻辑） | ✅ 向后兼容 |
+| 后端 new-api | 透传 content | 透传 tools + language | ✅ 向后兼容（新增可选参数） |
+| 资源配置 | values/strings.xml | 新增 values-en/values-ja | ✅ Android 标准机制 |
+| 导航 | Navigation Compose | 新增 ReportExportScreen 路由 | ✅ 增量添加 |
+| 设置页 | SettingsScreen | 新增 Agent 开关 + 语言选择 | ✅ 增量添加 |
+
+### v2.0 技术选型总表
+
+| 模块 | 技术 | 理由 |
+|------|------|------|
+| Agent 工具框架 | 客户端 ToolRegistry + ToolExecEngine | 工具执行在端侧，无需服务器资源 |
+| Agent 状态管理 | 自定义状态机 + Compose State | 轻量级，无需第三方库 |
+| SSE 增强解析 | 扩展 OkHttp EventSource 解析逻辑 | 复用现有网络栈 |
+| Web Search | Serper.dev / SearXNG API (HTTP) | 标准化搜索 API，非 Google 依赖 |
+| Calculator | exp4j / Kotlin 表达式求值 | 纯本地，无网络依赖 |
+| PDF 生成 | android.graphics.pdf.PdfDocument | 零依赖，平台原生 API |
+| PDF 渲染 | Canvas API | 灵活性高，支持中文 |
+| 文件分享 | FileProvider + Intent.ACTION_SEND | Android 标准方式 |
+| 国际化 | strings.xml + values-xx 目录 | Android 标准方式 |
+| 语言切换 | DataStore + CompositionLocal | 响应式 + 持久化 |
+| 后端交互 | 请求体 language 字段 | 简单直接，无需新增端点 |

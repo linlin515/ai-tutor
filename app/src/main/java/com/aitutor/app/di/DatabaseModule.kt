@@ -9,6 +9,7 @@ import com.aitutor.app.data.local.dao.MessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
 import com.aitutor.app.data.local.dao.ScoreLogDao
+import com.aitutor.app.data.local.dao.StudyReportDao
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao
 import com.aitutor.app.data.local.dao.UserScoreDao
 import com.aitutor.app.data.local.dao.WrongAnswerDao
@@ -94,5 +95,11 @@ object DatabaseModule {
     @Singleton
     fun provideSubscriptionCacheDao(database: AiTutorDatabase): SubscriptionCacheDao {
         return database.subscriptionCacheDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideStudyReportDao(database: AiTutorDatabase): StudyReportDao {
+        return database.studyReportDao()
     }
 }

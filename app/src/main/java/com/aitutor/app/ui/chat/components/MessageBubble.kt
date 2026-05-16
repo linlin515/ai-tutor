@@ -132,6 +132,14 @@ fun MessageBubble(
                             style = MaterialTheme.typography.bodyLarge
                         )
                     }
+                    MessageType.AGENT_STEP -> {
+                        // Agent 步骤消息由 ChatScreen 单独处理，这里作为兜底
+                        Text(
+                            text = "[Agent 步骤]",
+                            color = textColor,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
                 }
             }
 

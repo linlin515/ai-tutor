@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- General -->
+    <string name="app_name">AI Tutor</string>
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+    <string name="loading">Loading...</string>
+    <string name="error_network">Network error. Please check your connection.</string>
+    <string name="error_unknown">Unknown error</string>
+    <string name="retry">Retry</string>
+    <string name="back">Back</string>
+
+    <!-- Navigation -->
+    <string name="nav_chat">Chat</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_solve">Solve</string>
+    <string name="nav_quiz">Quiz</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- Auth -->
+    <string name="login_title">AI Tutor</string>
+    <string name="phone_hint">Enter phone number</string>
+    <string name="password_hint">Enter password</string>
+    <string name="login_button">Login</string>
+    <string name="register_button">Register</string>
+    <string name="login_loading">Logging in...</string>
+    <string name="register_title">Register</string>
+    <string name="confirm_password_hint">Confirm password</string>
+
+    <!-- Chat -->
+    <string name="input_hint">Ask me anything...</string>
+    <string name="send">Send</string>
+    <string name="voice_input_hint">Hold to talk</string>
+    <string name="voice_release_hint">Release to send</string>
+    <string name="thinking">Thinking...</string>
+    <string name="no_messages">Start your first conversation</string>
+    <string name="conversation_list">Conversations</string>
+    <string name="new_conversation">New Chat</string>
+
+    <!-- Agent Mode -->
+    <string name="agent_mode">AI Agent</string>
+    <string name="agent_thinking">AI is thinking...</string>
+    <string name="agent_searching">Searching: %1$s</string>
+    <string name="agent_tool_calling">Calling tool: %1$s</string>
+    <string name="agent_tool_result">Tool result: %1$s</string>
+    <string name="agent_thinking_progress">🤔 AI is thinking...</string>
+    <string name="agent_search_progress">🔍 Searching...</string>
+    <string name="agent_result_found">✅ Results found</string>
+    <string name="agent_answering">📝 AI is composing answer...</string>
+    <string name="agent_switch_label">Agent Mode</string>
+    <string name="agent_mode_chat">Chat Mode</string>
+    <string name="agent_mode_on">AI automatically decides whether to use tools</string>
+    <string name="search_source">Source: %1$s</string>
+    <string name="search_keyword">Keywords: %1$s</string>
+    <string name="search_results_count">%1$d results found</string>
+    <string name="internet_search">Internet Search</string>
+    <string name="internet_search_hint">Internet search:</string>
+
+    <!-- Camera/Solve -->
+    <string name="take_photo">Take Photo</string>
+    <string name="pick_from_gallery">Pick from Gallery</string>
+    <string name="photo_preview">Photo Preview</string>
+    <string name="confirm_photo">Confirm</string>
+    <string name="retake_photo">Retake</string>
+    <string name="solving">Solving...</string>
+    <string name="ocr_detected">Text detected</string>
+    <string name="choose_subject">Choose Subject</string>
+
+    <!-- Dashboard -->
+    <string name="dashboard_title">Dashboard</string>
+    <string name="study_time">Study Time</string>
+    <string name="solved_count">Questions Solved</string>
+    <string name="accuracy_rate">Accuracy Rate</string>
+    <string name="mastery_overview">Knowledge Mastery</string>
+    <string name="learning_trend">Learning Trend</string>
+    <string name="streak_days">Learning Streak</string>
+    <string name="achievements">Achievements</string>
+    <string name="today">Today</string>
+    <string name="week">This Week</string>
+    <string name="month">This Month</string>
+    <string name="total">Total</string>
+    <string name="no_data">No data</string>
+    <string name="days_7">Last 7 Days</string>
+    <string name="days_30">Last 30 Days</string>
+
+    <!-- Quiz -->
+    <string name="quiz_title">Interactive Quiz</string>
+    <string name="quiz_start">Start Quiz</string>
+    <string name="quiz_submit">Submit</string>
+    <string name="quiz_next">Next</string>
+    <string name="quiz_result">Quiz Result</string>
+    <string name="quiz_correct">Correct</string>
+    <string name="quiz_wrong">Wrong</string>
+    <string name="quiz_score">Score: %1$d / %2$d</string>
+    <string name="quiz_retry">Retry</string>
+
+    <!-- Profile -->
+    <string name="profile_title">Profile</string>
+    <string name="edit_profile">Edit Profile</string>
+    <string name="nickname">Nickname</string>
+    <string name="grade">Grade</string>
+    <string name="phone">Phone</string>
+    <string name="daily_quota">Daily Quota</string>
+    <string name="quota_used">Used %1$d / %2$d</string>
+    <string name="logout">Logout</string>
+    <string name="logout_confirm">Are you sure you want to log out? You will need to log in again to use the app.</string>
+    <string name="logout_title">Logout</string>
+    <string name="confirm_logout">Confirm Logout</string>
+    <string name="not_set">Not set</string>
+    <string name="edit_info_title">Edit Profile</string>
+    <string name="save_profile">Save</string>
+    <string name="cancel_edit">Cancel</string>
+    <string name="grade_hint">Enter grade</string>
+    <string name="nickname_hint">Enter nickname</string>
+
+    <!-- Settings -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_language">Language</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+    <string name="settings_model_params">Model &amp; Parameters</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_current_model">Current: %1$s</string>
+    <string name="settings_temperature">Temperature</string>
+    <string name="settings_top_p">Top-P</string>
+    <string name="settings_max_tokens">Max Tokens</string>
+    <string name="settings_theme_display">Theme &amp; Display</string>
+    <string name="settings_theme_mode">Theme Mode</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System</string>
+    <string name="settings_voice">Voice</string>
+    <string name="settings_tts_speed">TTS Speed</string>
+    <string name="settings_general">General</string>
+    <string name="settings_version">Version</string>
+    <string name="settings_clear_cache">Clear Cache</string>
+    <string name="settings_clear_cache_confirm">Clear %1$s of cached data?</string>
+    <string name="settings_clearing">Clearing…</string>
+    <string name="settings_cache_empty">Cache is already empty</string>
+    <string name="settings_cache_cleared">Cleared %1$.1f MB cache</string>
+    <string name="settings_profile">Profile</string>
+    <string name="settings_subscription">Subscription</string>
+
+    <!-- Subscription -->
+    <string name="subscription_title">Subscription</string>
+    <string name="subscription_placeholder">Subscription Management</string>
+
+    <!-- Study Report -->
+    <string name="report_title">Study Report</string>
+    <string name="report_weekly">Weekly</string>
+    <string name="report_monthly">Monthly</string>
+    <string name="report_export_pdf">Export PDF</string>
+    <string name="report_share">Share</string>
+    <string name="report_generating">Generating report...</string>
+    <string name="report_share_intent">Share Study Report</string>
+    <string name="report_auto_generate">Auto Generate</string>
+    <string name="report_every_monday">Every Monday</string>
+    <string name="report_every_month_1st">Every 1st of Month</string>
+    <string name="report_study_time">Total Study Time: %1$s</string>
+    <string name="report_solved_count">Questions Solved: %1$d ✅ Accuracy: %2$.1f%%</string>
+    <string name="report_mastery_overview">Mastery Overview</string>
+    <string name="report_wrong_answer_top5">Top 5 Wrong Answers</string>
+    <string name="report_learning_trend">Learning Trend</string>
+    <string name="report_entry">Study Report</string>
+    <string name="report_export">Export Study Report</string>
+    <string name="report_settings">Report Settings</string>
+    <string name="report_streak">Longest Streak</string>
+    <string name="report_total_conversations">Total Conversations</string>
+    <string name="report_subject_distribution">Subject Distribution</string>
+    <string name="report_achievements">Achievements</string>
+    <string name="report_commentary">Learning Star Commentary</string>
+    <string name="report_generated_by">Generated by AI Tutor</string>
+    <string name="report_pdf_failed">Failed to generate PDF</string>
+    <string name="report_share_failed">Failed to share</string>
+</resources>

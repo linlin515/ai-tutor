@@ -2,12 +2,21 @@ package com.aitutor.app.ui.settings
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +28,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.data.local.CacheSize
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,9 +36,11 @@ import kotlin.math.roundToInt
 fun SettingsScreen(
     onNavigateToProfile: () -> Unit = {},
     onNavigateToSubscription: () -> Unit = {},
+    onNavigateToReport: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
+    val currentLanguage by viewModel.currentLanguage.collectAsState()
 
     Column(
         modifier = Modifier
@@ -52,6 +64,16 @@ fun SettingsScreen(
                 Icon(Icons.Default.Star, contentDescription = null)
             },
             modifier = Modifier.clickable { onNavigateToSubscription() }
+        )
+        HorizontalDivider()
+
+        // Study Report entry (F50)
+        ListItem(
+            headlineContent = { Text("学习报告") },
+            leadingContent = {
+                Icon(Icons.Default.Assessment, contentDescription = null)
+            },
+            modifier = Modifier.clickable { onNavigateToReport() }
         )
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
@@ -100,6 +122,35 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
         HorizontalDivider()
 
+        // Language section (F51)
+        Text(
+            text = "语言 / Language",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        // Language selector chips
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            viewModel.availableLanguages.forEach { locale ->
+                FilterChip(
+                    selected = currentLanguage.language == locale.language,
+                    onClick = { viewModel.setLanguage(locale) },
+                    label = {
+                        Text(viewModel.getLanguageDisplayName(locale))
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider()
+
         // Theme section
         Text(
             text = "主题与显示",
@@ -135,6 +186,33 @@ fun SettingsScreen(
                 )
             }
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        HorizontalDivider()
+
+        // Agent section (v2.0)
+        Text(
+            text = "AI Agent",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        ListItem(
+            headlineContent = { Text("Agent 模式") },
+            supportingContent = {
+                Text(if (viewModel.agentEnabled.collectAsState().value) "已开启 - AI可联网搜索" else "已关闭")
+            },
+            leadingContent = {
+                Icon(Icons.Default.Psychology, contentDescription = null)
+            },
+            trailingContent = {
+                Switch(
+                    checked = viewModel.agentEnabled.collectAsState().value,
+                    onCheckedChange = { viewModel.toggleAgentMode() }
+                )
+            }
+        )
 
         Spacer(modifier = Modifier.height(8.dp))
         HorizontalDivider()
@@ -239,7 +317,9 @@ fun SettingsScreen(
                 val mb = cacheClearedBytes / (1024.0 * 1024.0)
                 Toast.makeText(
                     context,
-                    "已清除 ${"%.1f".format(mb)} MB 缓存",
+                    "已清除 ${
+                        "%.1f".format(mb)
+                    } MB 缓存",
                     Toast.LENGTH_SHORT
                 ).show()
             }

@@ -11,7 +11,10 @@ data class ChatCompletionRequest(
     @SerializedName("max_tokens") val maxTokens: Int,
     @SerializedName("grade") val grade: String? = null,
     @SerializedName("role") val role: String? = null,  // "tutor" or "assistant"
-    @SerializedName("system_prompt") val systemPrompt: String? = null
+    @SerializedName("system_prompt") val systemPrompt: String? = null,
+    // v2.0 Agent: 工具调用
+    @SerializedName("tools") val tools: List<ToolDefinitionDto>? = null,
+    @SerializedName("tool_choice") val toolChoice: String? = null
 )
 
 data class ChatMessageDto(
@@ -33,7 +36,9 @@ data class ChunkChoice(
 
 data class Delta(
     @SerializedName("role") val role: String?,
-    @SerializedName("content") val content: String?
+    @SerializedName("content") val content: String?,
+    // v2.0 Agent: 工具调用增量
+    @SerializedName("tool_calls") val toolCalls: List<ToolCallChunkDto>? = null
 )
 
 data class ChatAskRequest(

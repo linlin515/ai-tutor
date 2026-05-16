@@ -1,9 +1,12 @@
 package com.aitutor.app.ui.chat
 
+import com.aitutor.app.domain.model.AgentState
 import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.ChatMode
 import com.aitutor.app.domain.model.Conversation
 import com.aitutor.app.domain.model.TeachingState
+import com.aitutor.app.domain.model.ToolCallInfo
+import com.aitutor.app.domain.model.ToolResult
 import com.aitutor.app.domain.model.VoiceState
 
 data class ChatUiState(
@@ -29,5 +32,9 @@ data class ChatUiState(
     // Timestamp for idle timeout auto-exit (F42: 30 min)
     val tutorModeLastActiveTime: Long = System.currentTimeMillis(),
     // Whether the difficulty switcher is visible
-    val showDifficultySwitcher: Boolean = false
+    val showDifficultySwitcher: Boolean = false,
+    // v2.0 Agent: Agent 模式状态
+    val agentEnabled: Boolean = false,
+    val agentState: AgentState = AgentState.IDLE,
+    val showAgentSwitch: Boolean = false
 )
