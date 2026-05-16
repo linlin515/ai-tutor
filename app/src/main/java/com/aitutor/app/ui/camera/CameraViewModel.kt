@@ -24,9 +24,13 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.io.ByteArrayOutputStream
 import javax.inject.Inject
 
@@ -73,6 +77,14 @@ class CameraViewModel @Inject constructor(
     /** Reusable ML Kit TextRecognizer instance (on-device). */
     val textRecognizer: TextRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
+    /** OCR result from captured photo (as opposed to real-time camera frame OCR). */
+    private val _ocrResult = MutableStateFlow<String?>(null)
+    val ocrResult: StateFlow<String?> = _ocrResult.asStateFlow()
+
+    /** Whether OCR is currently running on the captured photo. */
+    var isOcrProcessing by mutableStateOf(false)
+        private set
+
     // ---- end OCR state ----
 
     private var solveJob: Job? = null
@@ -102,8 +114,36 @@ class CameraViewModel @Inject constructor(
         ocrRotationDegrees = rotationDegrees
     }
 
+    /**
+     * Run OCR on a captured [Bitmap] and update [ocrResult].
+     * Called automatically after a photo is captured.
+     */
+    fun processImageForOcr(bitmap: Bitmap) {
+        isOcrProcessing = true
+        viewModelScope.launch(Dispatchers.Default) {
+            try {
+                val inputImage = com.google.mlkit.vision.common.InputImage.fromBitmap(bitmap, 0)
+                val visionText = textRecognizer.process(inputImage).await()
+                val recognizedText = visionText.text
+                _ocrResult.value = recognizedText.ifBlank { null }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _ocrResult.value = null
+            } finally {
+                isOcrProcessing = false
+            }
+        }
+    }
+
+    /** Clear the captured-photo OCR result (e.g. when retaking). */
+    fun clearOcrResult() {
+        _ocrResult.value = null
+        isOcrProcessing = false
+    }
+
     fun retakePhoto() {
         solveJob?.cancel()
+        clearOcrResult()
         uiState = uiState.copy(
             capturedImageUri = null,
             showPreview = false,
@@ -293,6 +333,7 @@ class CameraViewModel @Inject constructor(
 
     fun resetState() {
         solveJob?.cancel()
+        clearOcrResult()
         uiState = CameraUiState()
     }
 

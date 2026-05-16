@@ -2,6 +2,7 @@ package com.aitutor.app.ui.camera
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -64,6 +65,29 @@ fun CameraScreen(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_BACK) }
     var imageCapture: ImageCapture? by remember { mutableStateOf(null) }
     var capturedFileUri by remember { mutableStateOf<Uri?>(null) }
+
+    // OCR result collected from ViewModel
+    val ocrResult by viewModel.ocrResult.collectAsState()
+    val isOcrProcessing by remember { derivedStateOf { viewModel.isOcrProcessing } }
+
+    // Trigger OCR when a photo is captured
+    LaunchedEffect(state.capturedImageUri) {
+        val uriStr = state.capturedImageUri
+        if (uriStr != null && !state.isAnalyzing) {
+            try {
+                val inputStream = context.contentResolver.openInputStream(Uri.parse(uriStr))
+                if (inputStream != null) {
+                    val bitmap = BitmapFactory.decodeStream(inputStream)
+                    inputStream.close()
+                    if (bitmap != null) {
+                        viewModel.processImageForOcr(bitmap)
+                    }
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
 
     // Gallery picker launcher
     val galleryLauncher = rememberLauncherForActivityResult(
@@ -319,6 +343,53 @@ fun CameraScreen(
                             }
                         }
                     } else {
+                        // OCR result preview (between subject selector and action buttons)
+                        if (isOcrProcessing || ocrResult != null) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Text(
+                                        text = "OCR 识别结果",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    if (isOcrProcessing) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                            Text(
+                                                text = "正在识别文字...",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    } else if (ocrResult != null) {
+                                        Text(
+                                            text = ocrResult!!,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            maxLines = 5,
+                                            overflow = TextOverflow.Ellipsis,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+
                         // Action buttons
                         Row(
                             modifier = Modifier
