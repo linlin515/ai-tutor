@@ -76,7 +76,7 @@ mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition"
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 
 # Gson
-gson = { group = "com.google.code.gson", name = "gson", version = "2.10.1" }
+gson = { group = "com.google.code.gson", name = "gson", version = "2.11.0" }
 
 # Core KTX
 core-ktx = { group = "androidx.core", name = "core-ktx", version = "1.12.0" }
