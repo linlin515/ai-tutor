@@ -60,7 +60,21 @@ android {
 
     signingConfigs {
         create("release") {
-            storeFile = file("debug.keystore")
+            val keystoreFile = file("debug.keystore")
+            if (!keystoreFile.exists()) {
+                logger.lifecycle("debug.keystore not found, auto-generating...")
+                exec {
+                    commandLine(
+                        "keytool", "-genkey", "-v", "-keystore", keystoreFile.absolutePath,
+                        "-alias", "aitutor", "-keyalg", "RSA", "-keysize", "2048",
+                        "-validity", "10000",
+                        "-storepass", "aitutor123", "-keypass", "aitutor123",
+                        "-dname", "CN=AI Tutor, OU=Development, O=AI Tutor, L=Beijing, ST=Beijing, C=CN"
+                    )
+                }
+                logger.lifecycle("debug.keystore auto-generated successfully")
+            }
+            storeFile = keystoreFile
             storePassword = System.getenv("KEYSTORE_PASSWORD")
             keyAlias = System.getenv("KEY_ALIAS")
             keyPassword = System.getenv("KEY_PASSWORD")
