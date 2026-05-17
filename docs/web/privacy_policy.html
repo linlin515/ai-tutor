@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy / 隐私政策 - AI 学伴 / AI Tutor</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.8; max-width: 780px; margin: 0 auto; padding: 20px; color: #333; }
+h1 { font-size: 24px; border-bottom: 2px solid #4A90D9; padding-bottom: 8px; }
+h2 { font-size: 20px; margin-top: 32px; color: #2c3e50; }
+h3 { font-size: 16px; margin-top: 24px; color: #34495e; }
+p, li { font-size: 15px; }
+ul { padding-left: 20px; }
+li { margin-bottom: 6px; }
+.updated { color: #888; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 14px; }
+th, td { border: 1px solid #ddd; padding: 10px 12px; text-align: left; }
+th { background-color: #f5f8fa; font-weight: 600; }
+tr:nth-child(even) { background-color: #f9f9f9; }
+.note { background: #fff3cd; border: 1px solid #ffeeba; padding: 12px 16px; border-radius: 4px; margin: 16px 0; }
+.checklist { list-style: none; padding-left: 0; }
+.checklist li::before { content: "☐ "; }
+</style>
+</head>
+<body>
+
+<h1>Privacy Policy / 隐私政策</h1>
+<p class="updated">最后更新日期：2026 年 5 月 16 日 | Last updated: 2026-05-16</p>
+
+<p>本隐私政策说明了 AI 学伴 / AI Tutor（以下简称"本应用"或"我们"）在您使用本应用时如何收集、使用、存储和保护您的个人信息。请在使用本应用前仔细阅读本政策。</p>
+<p><strong>包名：</strong><code>com.aitutor.app</code> | <strong>适用版本：</strong>1.0+</p>
+
+<h2>一、我们收集的信息</h2>
+
+<h3>1.1 您主动提供的信息</h3>
+<table>
+<tr><th>数据类型</th><th>详情</th><th>用途</th></tr>
+<tr><td>账户凭证</td><td>电子邮箱和/或手机号码、密码（加密存储）</td><td>用户注册与身份验证</td></tr>
+<tr><td>个人资料</td><td>昵称、头像、年级、学科偏好</td><td>个性化学习推荐</td></tr>
+<tr><td>学习内容</td><td>文字提问、语音录音、题目照片、答题记录、AI 对话历史</td><td>核心服务（AI 答疑、拍照解题、语音交互）</td></tr>
+<tr><td>订阅数据</td><td>购买凭证、订阅等级</td><td>付费会员管理</td></tr>
+<tr><td>反馈信息</td><td>客服咨询、错误报告</td><td>服务改进与问题解决</td></tr>
+</table>
+
+<h3>1.2 自动收集的信息</h3>
+<table>
+<tr><th>数据类型</th><th>详情</th><th>用途</th></tr>
+<tr><td>设备信息</td><td>设备型号、操作系统版本、Android ID、IP 地址、网络类型</td><td>兼容性保障、分析统计、安全保障</td></tr>
+<tr><td>使用日志</td><td>功能使用频率、会话时长、点击事件</td><td>产品优化、个性化推荐</td></tr>
+<tr><td>性能数据</td><td>崩溃日志、API 延迟、错误报告</td><td>稳定性监控、故障修复</td></tr>
+</table>
+
+<h3>1.3 权限使用说明</h3>
+<p>本应用仅在您主动使用对应功能时请求相关权限：</p>
+<table>
+<tr><th>权限</th><th>使用场景</th></tr>
+<tr><td>CAMERA（相机）</td><td>拍摄题目照片进行 OCR 识别解题</td></tr>
+<tr><td>RECORD_AUDIO（麦克风）</td><td>语音输入提问或语音对话</td></tr>
+<tr><td>INTERNET（网络）</td><td>与后端 AI 服务通信</td></tr>
+<tr><td>ACCESS_NETWORK_STATE（网络状态）</td><td>检测网络连接状态</td></tr>
+<tr><td>POST_NOTIFICATIONS（通知）</td><td>发送学习提醒和报告通知</td></tr>
+<tr><td>READ_EXTERNAL_STORAGE（存储）</td><td>从相册选择图片（仅限 Android 12 及以下）</td></tr>
+</table>
+
+<h3>1.4 第三方 SDK</h3>
+<table>
+<tr><th>SDK</th><th>用途</th><th>共享的数据</th></tr>
+<tr><td>CameraX（Google）</td><td>相机预览与拍照（OCR 拍照解题）</td><td>相机画面数据（仅在设备本地处理）</td></tr>
+<tr><td>ML Kit（Google）</td><td>文字识别（OCR）、翻译、语言检测</td><td>图片中的文字内容</td></tr>
+<tr><td>Retrofit / OkHttp</td><td>网络请求框架，与后端 API 通信</td><td>API 请求参数（问题内容、用户ID）</td></tr>
+<tr><td>Firebase Crashlytics</td><td>崩溃监控与分析</td><td>崩溃堆栈信息、设备型号、OS 版本</td></tr>
+<tr><td>Google Play 结算服务</td><td>应用内购买/订阅管理</td><td>购买凭证（由 Google 处理）</td></tr>
+</table>
+
+<div class="note">
+<strong>注：</strong>如未来版本集成第三方登录 SDK（如微信登录）或推送 SDK，本政策将同步更新。
+</div>
+
+<h2>二、信息的使用目的</h2>
+<ul>
+<li>提供和维持本应用的核心功能（AI 答疑、拍照解题、语音交互、学习报告）</li>
+<li>根据您的学习行为和偏好推荐个性化学习内容</li>
+<li>分析使用数据以改进产品功能、优化用户体验</li>
+<li>回复您的咨询、处理反馈的问题</li>
+<li>检测和防范欺诈、滥用等非法活动</li>
+<li>遵守法律法规要求</li>
+</ul>
+<p><strong>我们不会将您的学习内容用于定向广告，也不会出售您的个人信息。</strong></p>
+
+<h2>三、AI 与数据处理</h2>
+
+<h3>3.1 AI 后端</h3>
+<ul>
+<li>您的问题、照片和语音输入将被发送到后端服务器进行 AI 处理</li>
+<li>AI 对话可能会被记录用于模型改进，您可以在设置中关闭此选项</li>
+<li>AI Agent 模式（v2.0+）下部分查询可能触发联网搜索</li>
+</ul>
+
+<h3>3.2 Google Play 数据安全</h3>
+<p>以下数据安全信息与我们在 Google Play Console 中提交的内容一致：</p>
+<table>
+<tr><th>数据类别</th><th>是否收集</th><th>是否分享</th><th>是否必需</th></tr>
+<tr><td>位置信息</td><td>否</td><td>否</td><td>否</td></tr>
+<tr><td>个人信息（邮箱、姓名、用户ID）</td><td>是</td><td>否</td><td>是（账户必需）</td></tr>
+<tr><td>财务信息（订阅）</td><td>是（通过 Google Play）</td><td>否</td><td>否</td></tr>
+<tr><td>聊天消息（问题、AI 回复）</td><td>是</td><td>否</td><td>是（服务必需）</td></tr>
+<tr><td>照片/视频</td><td>是（拍照/相册）</td><td>否</td><td>是（拍照解题）</td></tr>
+<tr><td>音频/语音</td><td>是（语音输入）</td><td>否</td><td>否</td></tr>
+<tr><td>应用活动（使用统计）</td><td>是</td><td>否</td><td>否</td></tr>
+<tr><td>诊断信息（崩溃日志）</td><td>是</td><td>是（Firebase）</td><td>否</td></tr>
+<tr><td>设备 ID</td><td>是</td><td>否</td><td>否</td></tr>
+</table>
+
+<h2>四、数据存储与安全</h2>
+<ul>
+<li><strong>传输加密：</strong>所有 API 通信使用 TLS 1.3/1.2 加密</li>
+<li><strong>存储加密：</strong>敏感数据在服务端加密存储</li>
+<li><strong>访问控制：</strong>仅经授权人员可访问用户数据，实施严格的审计日志</li>
+<li><strong>数据保留：</strong>账户数据保留至注销；学习内容在账户删除后 90 天内清除</li>
+<li><strong>本地数据：</strong>部分学习数据缓存在设备本地，可在设置中清除缓存</li>
+<li><strong>跨境传输：</strong>服务器位于 [新加坡/美国/地区]，通过标准合同条款（SCC）保障数据传输安全</li>
+</ul>
+
+<h2>五、用户权利</h2>
+<table>
+<tr><th>权利</th><th>行使方式</th></tr>
+<tr><td>知情权</td><td>阅读本隐私政策了解数据收集情况</td></tr>
+<tr><td>访问权</td><td>在应用内查看个人资料和学习记录</td></tr>
+<tr><td>更正权</td><td>在应用设置中编辑个人资料</td></tr>
+<tr><td>删除权</td><td>在"个人中心"申请注销账户，30 天内完成删除</td></tr>
+<tr><td>撤回同意</td><td>在设备设置中关闭相机、麦克风等权限</td></tr>
+<tr><td>选择退出 AI 训练</td><td>在设置中关闭"用对话改进 AI"选项</td></tr>
+<tr><td>数据可移植性</td><td>联系客服获取数据副本</td></tr>
+<tr><td>投诉权</td><td>向监管机构投诉（如适用）</td></tr>
+</table>
+
+<h2>六、儿童隐私保护</h2>
+<p>本应用主要面向 K-12 学生用户。我们高度重视儿童隐私：</p>
+<ul>
+<li><strong>年龄门槛：</strong>美国 COPPA（13 岁以下）、欧盟 GDPR-K（16 岁以下，各成员国可降低至 13 岁）、中国《个人信息保护法》（14 岁以下）</li>
+<li><strong>监护人同意：</strong>未满年龄门槛的用户需在监护人同意后方可使用</li>
+<li><strong>最小化收集：</strong>仅收集学习内容和基本资料（昵称、年级），不收集精确位置、通讯录、浏览历史</li>
+<li><strong>无行为广告：</strong>不对儿童投放行为定向广告</li>
+<li><strong>监护人权利：</strong>监护人可查看、删除其子女的数据，或拒绝进一步收集</li>
+<li><strong>验证机制：</strong>可能需要监护人邮箱验证后方可激活儿童账户</li>
+</ul>
+<p>如您是监护人，认为您的子女在未经您同意的情况下提供了个人信息，请立即通过隐私邮箱联系我们，我们将删除相关数据。</p>
+
+<h2>七、第三方分享与跨境传输</h2>
+<ul>
+<li><strong>不出售：</strong>我们不会向第三方出售您的个人信息</li>
+<li><strong>无行为广告：</strong>不将数据用于跨情境行为广告</li>
+<li><strong>服务提供商：</strong>云服务、AI 模型 API、分析服务等第三方提供商通过合同约定仅按我们的指示处理数据</li>
+<li><strong>法律要求：</strong>如法律强制要求披露数据，在法律允许范围内将通知您</li>
+</ul>
+
+<h2>八、数据泄露通知</h2>
+<p>如果发生涉及您个人信息的數據泄露事件，我们将在发现后 72 小时内：</p>
+<ol>
+<li>通知受影响用户</li>
+<li>说明泄露的性质和范围</li>
+<li>建议您可采取的自我保护措施</li>
+<li>依法向相关监管机构报告</li>
+</ol>
+
+<h2>九、政策更新</h2>
+<p>我们可能不时更新本隐私政策。重大变更将通过以下方式通知：</p>
+<ul>
+<li>应用内弹窗或通知</li>
+<li>更新本页面的"最后更新日期"</li>
+<li>电子邮件通知（如您提供了邮箱）</li>
+</ul>
+
+<h2>十、联系我们</h2>
+<table>
+<tr><th>事项</th><th>联系方式</th></tr>
+<tr><td>隐私相关问题</td><td>privacy@aitutor.app</td></tr>
+<tr><td>技术支持</td><td>support@aitutor.app</td></tr>
+<tr><td>数据删除请求</td><td>privacy@aitutor.app</td></tr>
+<tr><td>监护人咨询</td><td>privacy@aitutor.app</td></tr>
+</table>
+<p><strong>通信地址：</strong>[待填写 — 公司注册地址]</p>
+
+<div class="note">
+<strong>⚠️ 开发者注意事项：</strong>在上架前须将上述联系邮箱替换为真实运营邮箱。
+<code>aitutor.app</code> 域名需要注册并配置邮件服务，或使用真实邮箱地址。
+</div>
+
+<h2>附：部署指引</h2>
+<p>Google Play 要求隐私政策可通过公开 URL 访问。推荐以下方式：</p>
+<ul>
+<li><strong>GitHub Pages（推荐）：</strong>将本 HTML 文件上传至 GitHub 仓库的 <code>docs/</code> 目录，启用 GitHub Pages</li>
+<li><strong>Google Drive：</strong>上传后设置为"拥有链接者可查看"，复制分享链接</li>
+<li><strong>自有域名：</strong>在 App 官网（如 <code>https://aitutor.app/privacy</code>）托管</li>
+</ul>
+<p>托管后在 Google Play Console > 选择应用 > Store presence > Store settings > Privacy Policy 中填入 URL。</p>
+
+<h2>附：合规检查清单</h2>
+<ul class="checklist">
+<li>隐私政策已托管在公开 URL</li>
+<li>隐私政策 URL 已在 Google Play Console 填写</li>
+<li>Google Play 数据安全表单已填写（与本政策一致）</li>
+<li>年龄评级问卷已在 Play Console 完成</li>
+<li>儿童隐私保护措施已实施</li>
+<li>未达年龄用户的监护人同意流程已实现</li>
+<li>联系信息已验证并可用</li>
+<li>第三方 SDK 数据收集已审查</li>
+<li>AI 对话训练选择退出开关已在设置中提供</li>
+<li>账户注销功能已实现</li>
+</ul>
+
+</body>
+</html>

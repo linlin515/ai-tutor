@@ -30,6 +30,7 @@ import com.aitutor.app.ui.chat.ChatScreen
 import com.aitutor.app.ui.auth.LoginScreen
 import com.aitutor.app.ui.auth.LoginViewModel
 import com.aitutor.app.ui.profile.ProfileScreen
+import com.aitutor.app.ui.report.ReportExportScreen
 import com.aitutor.app.ui.settings.SettingsScreen
 import com.aitutor.app.ui.settings.PrivacyPolicyScreen
 import com.aitutor.app.ui.settings.UserAgreementScreen
@@ -194,6 +195,9 @@ fun AppNavGraph(
                     onNavigateToSubscription = {
                         navController.navigate(Routes.SUBSCRIPTION)
                     },
+                    onNavigateToReport = {
+                        navController.navigate(Routes.REPORT)
+                    },
                     onNavigateToPrivacyPolicy = {
                         navController.navigate(Routes.PRIVACY_POLICY)
                     },
@@ -246,6 +250,12 @@ fun AppNavGraph(
 
             composable(Routes.REVIEW) {
                 ReviewScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.REPORT) {
+                ReportExportScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

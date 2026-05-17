@@ -1,0 +1,85 @@
+# ============================================================
+# docker-compose.yml — AI 学伴后端部署编排
+# 启动三个服务：应用、PostgreSQL、Redis
+# ============================================================
+
+services:
+  # ---------- 后端应用 ----------
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-tutor-app
+    ports:
+      - "5100:8100"
+    volumes:
+      # 将 .env 文件挂载到容器中（只读）
+      - ./.env.docker:/app/.env:ro
+    environment:
+      # 数据库连接（PostgreSQL）
+      - DATABASE_URL=postgresql+asyncpg://aiuser:ai_password@postgres:5432/ai_tutor
+      # Redis 连接
+      - REDIS_URL=redis://redis:6379/0
+      # new-api 代理地址（连接到宿主机）
+      - NEW_API_BASE_URL=http://host.docker.internal:3000/v1
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - ai-tutor-network
+
+  # ---------- PostgreSQL 数据库 ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: ai-tutor-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: ai_tutor
+      POSTGRES_USER: aiuser
+      POSTGRES_PASSWORD: ai_password
+      TZ: Asia/Shanghai
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aiuser -d ai_tutor"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ai-tutor-network
+
+  # ---------- Redis 缓存 ----------
+  redis:
+    image: redis:7-alpine
+    container_name: ai-tutor-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ai-tutor-network
+
+# ---------- 持久化卷 ----------
+volumes:
+  pgdata:
+    name: ai-tutor-pgdata
+  redisdata:
+    name: ai-tutor-redisdata
+
+# ---------- 网络 ----------
+networks:
+  ai-tutor-network:
+    name: ai-tutor-network
+    driver: bridge

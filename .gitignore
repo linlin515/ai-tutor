@@ -1,7 +1,7 @@
 # Android build artifacts
-build/
-app/build/
-app/release/
+android/build/
+android/app/build/
+android/app/release/
 *.apk
 *.aab
 *.ap_
@@ -10,12 +10,9 @@ app/release/
 
 # Gradle
 .gradle/
-gradle/
-local.properties
 *.iml
 .idea/
-.gradle/
-build/
+android/local.properties
 
 # IDE
 .idea/
@@ -32,6 +29,16 @@ captures/
 .cxx/
 *.keystore
 *.jks
+
+# Python / Backend
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+backend/.pytest_cache/
+backend/*.pyc
+backend/*.pyo
+backend/.env
+backend/ai_tutor.db
 
 # OS files
 .DS_Store
