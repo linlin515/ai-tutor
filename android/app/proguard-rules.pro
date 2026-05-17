@@ -30,6 +30,15 @@
 }
 
 # ====================
+# CrashHandler — 崩溃监控保留规则
+# ====================
+-keep class com.aitutor.app.data.local.CrashHandler { *; }
+-keepclassmembers class com.aitutor.app.data.local.CrashHandler$Companion {
+    *;
+}
+-keepclassmembers class com.aitutor.app.ui.settings.CrashLogViewModel { *; }
+
+# ====================
 # 应用主包 — 保留所有类（按需细化）
 # ====================
 -keep class com.aitutor.app.** { *; }

@@ -10,16 +10,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +32,9 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.data.local.CacheSize
 import com.aitutor.app.domain.model.AppSettings
+import com.aitutor.app.domain.model.AppUpdateInfo
 import com.aitutor.app.domain.model.ThemeMode
+import com.aitutor.app.domain.usecase.CheckResult
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -41,10 +46,12 @@ fun SettingsScreen(
     onNavigateToReport: () -> Unit = {},
     onNavigateToPrivacyPolicy: () -> Unit = {},
     onNavigateToUserAgreement: () -> Unit = {},
+    onNavigateToCrashLog: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
     val currentLanguage by viewModel.currentLanguage.collectAsState()
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
@@ -249,9 +256,63 @@ fun SettingsScreen(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
+        // App version display
+        val packageInfo = remember {
+            try {
+                context.packageManager.getPackageInfo(context.packageName, 0)
+            } catch (e: Exception) { null }
+        }
+        val versionName = packageInfo?.versionName ?: "1.0.0"
+        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            packageInfo?.longVersionCode ?: 1
+        } else {
+            @Suppress("DEPRECATION")
+            packageInfo?.versionCode?.toLong() ?: 1
+        }
+
         ListItem(
             headlineContent = { Text("版本") },
-            supportingContent = { Text("v1.0.0 (build 1)") }
+            supportingContent = { Text("v$versionName (build $versionCode)") }
+        )
+
+        HorizontalDivider()
+
+        // Check Update button
+        val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
+        ListItem(
+            headlineContent = {
+                if (isCheckingUpdate) {
+                    Text("正在检查更新…")
+                } else {
+                    Text("检查更新")
+                }
+            },
+            leadingContent = {
+                if (isCheckingUpdate) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp
+                    )
+                } else {
+                    Icon(Icons.Default.SystemUpdate, contentDescription = null)
+                }
+            },
+            modifier = Modifier.clickable(enabled = !isCheckingUpdate) {
+                viewModel.checkForUpdate()
+            }
+        )
+
+        HorizontalDivider()
+
+        ListItem(
+            headlineContent = { Text("崩溃日志") },
+            supportingContent = {
+                Text("查看应用崩溃记录")
+            },
+            leadingContent = {
+                Icon(Icons.Default.BugReport, contentDescription = null)
+            },
+            modifier = Modifier.clickable { onNavigateToCrashLog() }
         )
 
         HorizontalDivider()
@@ -287,7 +348,6 @@ fun SettingsScreen(
         val cacheProgress by viewModel.cacheProgress.collectAsState()
         val cacheClearedBytes by viewModel.cacheClearedBytes.collectAsState()
         var showClearDialog by remember { mutableStateOf(false) }
-        val context = LocalContext.current
 
         ListItem(
             headlineContent = { Text("清除缓存") },
@@ -354,6 +414,42 @@ fun SettingsScreen(
                     Toast.LENGTH_SHORT
                 ).show()
             }
+        }
+
+        // ============================================================
+        // P0-3 应用内更新检测
+        // ============================================================
+
+        val updateCheckResult by viewModel.updateCheckResult.collectAsState()
+        var showUpdateDialog by remember { mutableStateOf<AppUpdateInfo?>(null) }
+
+        // Handle update check results
+        LaunchedEffect(updateCheckResult) {
+            when (val result = updateCheckResult) {
+                is CheckResult.NoUpdate -> {
+                    Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                    viewModel.clearUpdateResult()
+                }
+                is CheckResult.UpdateAvailable -> {
+                    showUpdateDialog = result.info
+                }
+                is CheckResult.Error -> {
+                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                    viewModel.clearUpdateResult()
+                }
+                null -> { /* no result yet */ }
+            }
+        }
+
+        // Update dialog
+        showUpdateDialog?.let { info ->
+            UpdateDialog(
+                updateInfo = info,
+                onDismiss = {
+                    showUpdateDialog = null
+                    viewModel.clearUpdateResult()
+                }
+            )
         }
 
         Spacer(modifier = Modifier.height(32.dp))

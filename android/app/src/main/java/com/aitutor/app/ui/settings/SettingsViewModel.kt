@@ -1,5 +1,6 @@
 package com.aitutor.app.ui.settings
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.aitutor.app.data.local.CacheManager
@@ -9,7 +10,10 @@ import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
 import com.aitutor.app.domain.repository.AgentRepository
 import com.aitutor.app.domain.repository.SettingsRepository
+import com.aitutor.app.domain.usecase.AppUpdateChecker
+import com.aitutor.app.domain.usecase.CheckResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +21,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import javax.inject.Inject
 
@@ -25,7 +30,8 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val cacheManager: CacheManager,
     private val languagePreferences: LanguagePreferences,
-    private val agentRepository: AgentRepository
+    private val agentRepository: AgentRepository,
+    private val appUpdateChecker: AppUpdateChecker
 ) : ViewModel() {
 
     val settings: StateFlow<AppSettings> = settingsRepository.getSettings()
@@ -148,5 +154,50 @@ class SettingsViewModel @Inject constructor(
             val newValue = !_agentEnabled.value
             agentRepository.setAgentEnabled(newValue)
         }
+    }
+
+    // ============================================================
+    // P0-3 应用内更新检测
+    // ============================================================
+
+    private val _updateCheckResult = MutableStateFlow<CheckResult?>(null)
+    val updateCheckResult: StateFlow<CheckResult?> = _updateCheckResult.asStateFlow()
+
+    private val _isCheckingUpdate = MutableStateFlow(false)
+    val isCheckingUpdate: StateFlow<Boolean> = _isCheckingUpdate.asStateFlow()
+
+    /**
+     * 检查应用更新
+     * 网络不可用时直接 Toast 提示
+     */
+    fun checkForUpdate() {
+        if (_isCheckingUpdate.value) return
+
+        _isCheckingUpdate.value = true
+        _updateCheckResult.value = null
+
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    appUpdateChecker.checkForUpdate()
+                }
+                _updateCheckResult.value = result
+                Log.d("SettingsViewModel", "Update check result: $result")
+            } catch (e: Exception) {
+                Log.e("SettingsViewModel", "Update check failed", e)
+                _updateCheckResult.value = CheckResult.Error(
+                    e.message ?: "未知错误"
+                )
+            } finally {
+                _isCheckingUpdate.value = false
+            }
+        }
+    }
+
+    /**
+     * 清除更新检查结果（关闭弹窗后调用）
+     */
+    fun clearUpdateResult() {
+        _updateCheckResult.value = null
     }
 }

@@ -31,6 +31,7 @@ import com.aitutor.app.ui.auth.LoginScreen
 import com.aitutor.app.ui.auth.LoginViewModel
 import com.aitutor.app.ui.profile.ProfileScreen
 import com.aitutor.app.ui.report.ReportExportScreen
+import com.aitutor.app.ui.settings.CrashLogScreen
 import com.aitutor.app.ui.settings.SettingsScreen
 import com.aitutor.app.ui.settings.PrivacyPolicyScreen
 import com.aitutor.app.ui.settings.UserAgreementScreen
@@ -203,6 +204,9 @@ fun AppNavGraph(
                     },
                     onNavigateToUserAgreement = {
                         navController.navigate(Routes.USER_AGREEMENT)
+                    },
+                    onNavigateToCrashLog = {
+                        navController.navigate(Routes.CRASH_LOG)
                     }
                 )
             }
@@ -215,6 +219,12 @@ fun AppNavGraph(
 
             composable(Routes.USER_AGREEMENT) {
                 UserAgreementScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Routes.CRASH_LOG) {
+                CrashLogScreen(
                     onBack = { navController.popBackStack() }
                 )
             }
