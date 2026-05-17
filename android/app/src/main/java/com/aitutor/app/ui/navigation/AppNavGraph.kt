@@ -29,6 +29,7 @@ import com.aitutor.app.ui.camera.CameraScreen
 import com.aitutor.app.ui.chat.ChatScreen
 import com.aitutor.app.ui.auth.LoginScreen
 import com.aitutor.app.ui.auth.LoginViewModel
+import com.aitutor.app.ui.onboarding.OnboardingScreen
 import com.aitutor.app.ui.profile.ProfileScreen
 import com.aitutor.app.ui.report.ReportExportScreen
 import com.aitutor.app.ui.settings.CrashLogScreen
@@ -117,6 +118,21 @@ fun AppNavGraph(
                     onNavigateToMain = {
                         navController.navigate(Routes.MAIN) {
                             popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
+                    },
+                    onNavigateToOnboarding = {
+                        navController.navigate(Routes.ONBOARDING) {
+                            popUpTo(Routes.SPLASH) { inclusive = true }
+                        }
+                    }
+                )
+            }
+
+            composable(Routes.ONBOARDING) {
+                OnboardingScreen(
+                    onOnboardingComplete = {
+                        navController.navigate(Routes.LOGIN) {
+                            popUpTo(Routes.ONBOARDING) { inclusive = true }
                         }
                     }
                 )

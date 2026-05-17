@@ -1,5 +1,6 @@
 package com.aitutor.app.ui.chat.components
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -11,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -23,8 +25,11 @@ fun ChatInputBar(
     onSend: () -> Unit,
     onVoiceClick: () -> Unit,
     onAddAttachment: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    isOnline: Boolean = true
 ) {
+    val context = LocalContext.current
+
     Surface(
         tonalElevation = 3.dp,
         modifier = Modifier.fillMaxWidth()
@@ -56,7 +61,7 @@ fun ChatInputBar(
             // Character count
             if (inputText.isNotEmpty()) {
                 Text(
-                    text = "\${inputText.length}/2000",
+                    text = "${inputText.length}/2000",
                     style = MaterialTheme.typography.labelSmall,
                     color = if (inputText.length >= 1900) MaterialTheme.colorScheme.error
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -77,9 +82,16 @@ fun ChatInputBar(
                     )
                 }
             } else {
+                val sendEnabled = enabled && isOnline
                 FilledIconButton(
-                    onClick = onSend,
-                    enabled = enabled
+                    onClick = {
+                        if (!isOnline) {
+                            Toast.makeText(context, "当前无网络连接", Toast.LENGTH_SHORT).show()
+                        } else {
+                            onSend()
+                        }
+                    },
+                    enabled = sendEnabled
                 ) {
                     Icon(Icons.Default.Send, contentDescription = "发送")
                 }

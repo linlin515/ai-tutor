@@ -174,3 +174,23 @@ val MIGRATION_2_3 = Migration(2, 3) { db ->
         """.trimIndent()
     )
 }
+
+/**
+ * Room database migration from version 3 to 4.
+ *
+ * v3: all previous tables
+ * v4: +pending_messages for P1-2 offline message queue
+ */
+val MIGRATION_3_4 = Migration(3, 4) { db ->
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `pending_messages` (
+            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            `conversationId` INTEGER NOT NULL,
+            `content` TEXT NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `retryCount` INTEGER NOT NULL DEFAULT 0
+        )
+        """.trimIndent()
+    )
+}

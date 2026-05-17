@@ -12,38 +12,42 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.aitutor.app.data.local.OnboardingDataStore
 import com.aitutor.app.data.remote.interceptor.TokenManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
-    private val tokenManager: TokenManager
+    private val tokenManager: TokenManager,
+    private val onboardingDataStore: OnboardingDataStore
 ) : ViewModel() {
 
     private val _isLoggedIn = mutableStateOf(false)
     val isLoggedIn: State<Boolean> = _isLoggedIn
 
-    fun checkAuth() {
-        viewModelScope.launch {
-            delay(1500)
-            _isLoggedIn.value = tokenManager.isLoggedIn()
-        }
+    private val _isOnboardingDone = mutableStateOf(true)
+    val isOnboardingDone: State<Boolean> = _isOnboardingDone
+
+    suspend fun checkStartupState() {
+        delay(1500)
+        _isLoggedIn.value = tokenManager.isLoggedIn()
+        _isOnboardingDone.value = onboardingDataStore.isOnboardingDone.first()
     }
 }
 
 @Composable
 fun SplashScreen(
     onNavigateToLogin: () -> Unit,
-    onNavigateToMain: () -> Unit
+    onNavigateToMain: () -> Unit,
+    onNavigateToOnboarding: () -> Unit = {}
 ) {
     val viewModel: SplashViewModel = hiltViewModel()
-    val isLoggedIn by viewModel.isLoggedIn
     var startAnimation by remember { mutableStateOf(false) }
     var navigationHandled by remember { mutableStateOf(false) }
 
@@ -56,14 +60,23 @@ fun SplashScreen(
     // Single LaunchedEffect for the entire splash flow
     LaunchedEffect(Unit) {
         startAnimation = true
-        viewModel.checkAuth()
 
-        // Wait for auth check + minimum splash duration
+        // Run startup check concurrently with splash timer
+        val startupCheck = launch {
+            viewModel.checkStartupState()
+        }
+
+        // Wait for minimum splash duration
         delay(2500)
+
+        // Ensure startup check has completed (usually finishes at 1500ms)
+        startupCheck.join()
 
         if (!navigationHandled) {
             navigationHandled = true
-            if (isLoggedIn) {
+            if (!viewModel.isOnboardingDone.value) {
+                onNavigateToOnboarding()
+            } else if (viewModel.isLoggedIn.value) {
                 onNavigateToMain()
             } else {
                 onNavigateToLogin()
@@ -82,7 +95,7 @@ fun SplashScreen(
             modifier = Modifier.alpha(alphaAnim.value)
         ) {
             Text(
-                text = "📚",
+                text = "\uD83D\uDCDA",
                 fontSize = 72.sp
             )
             Spacer(modifier = Modifier.height(16.dp))

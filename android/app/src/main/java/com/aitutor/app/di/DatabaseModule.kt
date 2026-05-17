@@ -6,6 +6,7 @@ import com.aitutor.app.data.local.dao.AchievementDao
 import com.aitutor.app.data.local.dao.AnalyticsDao
 import com.aitutor.app.data.local.dao.ConversationDao
 import com.aitutor.app.data.local.dao.MessageDao
+import com.aitutor.app.data.local.dao.PendingMessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
 import com.aitutor.app.data.local.dao.ScoreLogDao
@@ -16,6 +17,7 @@ import com.aitutor.app.data.local.dao.WrongAnswerDao
 import com.aitutor.app.data.local.db.AiTutorDatabase
 import com.aitutor.app.data.local.db.MIGRATION_1_2
 import com.aitutor.app.data.local.db.MIGRATION_2_3
+import com.aitutor.app.data.local.db.MIGRATION_3_4
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn

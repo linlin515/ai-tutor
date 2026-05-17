@@ -36,5 +36,7 @@ data class ChatUiState(
     // v2.0 Agent: Agent 模式状态
     val agentEnabled: Boolean = false,
     val agentState: AgentState = AgentState.IDLE,
-    val showAgentSwitch: Boolean = false
+    val showAgentSwitch: Boolean = false,
+    // P1-2: Network state
+    val isOnline: Boolean = true
 )

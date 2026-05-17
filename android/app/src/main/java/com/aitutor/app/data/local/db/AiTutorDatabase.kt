@@ -6,6 +6,7 @@ import com.aitutor.app.data.local.dao.AchievementDao
 import com.aitutor.app.data.local.dao.AnalyticsDao
 import com.aitutor.app.data.local.dao.ConversationDao
 import com.aitutor.app.data.local.dao.MessageDao
+import com.aitutor.app.data.local.dao.PendingMessageDao
 import com.aitutor.app.data.local.dao.PendingSubmissionDao
 import com.aitutor.app.data.local.dao.QuizRecordDao
 import com.aitutor.app.data.local.dao.ScoreLogDao
@@ -18,6 +19,7 @@ import com.aitutor.app.data.local.entity.ConversationEntity
 import com.aitutor.app.data.local.entity.KnowledgePointEntity
 import com.aitutor.app.data.local.entity.LearningRecordEntity
 import com.aitutor.app.data.local.entity.MessageEntity
+import com.aitutor.app.data.local.entity.PendingMessageEntity
 import com.aitutor.app.data.local.entity.PendingSubmissionEntity
 import com.aitutor.app.data.local.entity.QuizRecordEntity
 import com.aitutor.app.data.local.entity.ScoreLogEntity
@@ -37,9 +39,10 @@ import com.aitutor.app.data.local.entity.WrongAnswerEntity
         AchievementEntity::class,
         UserScoreEntity::class,
         ScoreLogEntity::class,
-        SubscriptionCacheEntity::class
+        SubscriptionCacheEntity::class,
+        PendingMessageEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class AiTutorDatabase : RoomDatabase() {
@@ -54,4 +57,5 @@ abstract class AiTutorDatabase : RoomDatabase() {
     abstract fun subscriptionCacheDao(): SubscriptionCacheDao
     abstract fun scoreLogDao(): ScoreLogDao
     abstract fun studyReportDao(): StudyReportDao
+    abstract fun pendingMessageDao(): PendingMessageDao
 }

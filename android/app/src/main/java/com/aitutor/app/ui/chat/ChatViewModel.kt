@@ -31,6 +31,7 @@ import com.aitutor.app.domain.repository.SettingsRepository
 import com.aitutor.app.domain.repository.SolveRepository
 import com.aitutor.app.domain.repository.VoiceRepository
 import com.aitutor.app.domain.usecase.chat.ProcessTeachingResponseUseCase
+import com.aitutor.app.util.NetworkMonitor
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -53,6 +54,7 @@ class ChatViewModel @Inject constructor(
     private val solveRepository: SolveRepository,
     private val agentRepository: AgentRepository,
     private val languagePreferences: LanguagePreferences,
+    private val networkMonitor: NetworkMonitor,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
 
@@ -68,6 +70,7 @@ class ChatViewModel @Inject constructor(
         loadConversations()
         loadUserGrade()
         observeAgentEnabled()
+        observeNetworkState()
         initTools()
     }
 
@@ -90,6 +93,17 @@ class ChatViewModel @Inject constructor(
         viewModelScope.launch {
             agentRepository.getAgentEnabled().collectLatest { enabled ->
                 uiState = uiState.copy(agentEnabled = enabled)
+            }
+        }
+    }
+
+    /**
+     * P1-2: 观察网络连接状态
+     */
+    private fun observeNetworkState() {
+        viewModelScope.launch {
+            networkMonitor.isOnline.collectLatest { online ->
+                uiState = uiState.copy(isOnline = online)
             }
         }
     }
@@ -275,6 +289,12 @@ class ChatViewModel @Inject constructor(
     fun sendMessage() {
         val text = uiState.inputText.trim()
         if (text.isEmpty() || uiState.isStreaming) return
+
+        // P1-2: Check network before sending
+        if (!networkMonitor.isCurrentlyOnline()) {
+            uiState = uiState.copy(errorMessage = "当前无网络连接，无法发送消息")
+            return
+        }
 
         updateLastActiveTime()
 

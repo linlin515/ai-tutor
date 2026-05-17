@@ -8,6 +8,7 @@ import com.aitutor.app.data.remote.api.QuizApi
 import com.aitutor.app.data.remote.api.SolveApi
 import com.aitutor.app.data.remote.api.SubscriptionApi
 import com.aitutor.app.data.remote.interceptor.AuthInterceptor
+import com.aitutor.app.data.remote.interceptor.NetworkErrorInterceptor
 import com.aitutor.app.data.remote.interceptor.TokenManager
 import com.aitutor.app.data.tool.impl.WebSearchTool
 import com.aitutor.app.data.tool.registry.ToolRegistry
@@ -49,12 +50,20 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideNetworkErrorInterceptor(): NetworkErrorInterceptor {
+        return NetworkErrorInterceptor()
+    }
+
+    @Provides
+    @Singleton
     fun provideOkHttpClient(
         authInterceptor: AuthInterceptor,
+        networkErrorInterceptor: NetworkErrorInterceptor,
         loggingInterceptor: HttpLoggingInterceptor
     ): OkHttpClient {
         return OkHttpClient.Builder()
             .addInterceptor(authInterceptor)
+            .addInterceptor(networkErrorInterceptor)
             .addInterceptor(loggingInterceptor)
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(0, TimeUnit.SECONDS) // 无限超时用于 SSE

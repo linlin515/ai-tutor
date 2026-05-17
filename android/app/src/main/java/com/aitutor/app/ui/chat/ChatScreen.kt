@@ -41,6 +41,7 @@ import com.aitutor.app.ui.chat.components.TeachingModeToggle
 import com.aitutor.app.ui.chat.components.UnderstandingBadge
 import com.aitutor.app.ui.chat.components.VoiceInputBar
 import com.aitutor.app.ui.common.EmptyStateView
+import com.aitutor.app.ui.components.NetworkBanner
 import com.aitutor.app.ui.conversation.ConversationListSheet
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -233,18 +234,19 @@ fun ChatScreen(
                     onSend = { viewModel.sendMessage() },
                     onVoiceClick = { handleVoiceClick() },
                     onAddAttachment = onNavigateToCamera,
-                    enabled = !state.isStreaming
+                    enabled = !state.isStreaming,
+                    isOnline = state.isOnline
                 )
             }
         }
-    ) { padding ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            if (state.messages.isEmpty() && !state.isStreaming) {
+        ) { padding ->
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .background(MaterialTheme.colorScheme.background)
+            ) {
+                if (state.messages.isEmpty() && !state.isStreaming) {
                 // Empty state with mode-specific hints
                 EmptyStateView(
                     title = "开始一段新的对话吧",
@@ -428,6 +430,12 @@ fun ChatScreen(
                     }
                 }
             }
+
+            // P1-2: Network disconnected banner at top
+            NetworkBanner(
+                isOnline = state.isOnline,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
 
             // Error
             if (state.errorMessage != null) {
