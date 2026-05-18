@@ -1,10 +1,12 @@
 package com.aitutor.app.ui.chat
 
 import android.content.Context
+import com.aitutor.app.data.remote.datastore.LanguagePreferences
 import com.aitutor.app.data.repository.UserProfileRepository
 import com.aitutor.app.domain.model.*
 import com.aitutor.app.domain.repository.*
 import com.aitutor.app.domain.usecase.chat.ProcessTeachingResponseUseCase
+import com.aitutor.app.util.NetworkMonitor
 import com.aitutor.app.utils.BaseViewModelTest
 import io.mockk.*
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -25,6 +27,8 @@ class ChatViewModelTest : BaseViewModelTest() {
     private val processTeachingResponseUseCase: ProcessTeachingResponseUseCase = mockk()
     private val solveRepository: SolveRepository = mockk()
     private val agentRepository: AgentRepository = mockk()
+    private lateinit var languagePreferences: LanguagePreferences
+    private lateinit var networkMonitor: NetworkMonitor
     private val context: Context = mockk(relaxed = true)
     private lateinit var viewModel: ChatViewModel
 
@@ -47,10 +51,14 @@ class ChatViewModelTest : BaseViewModelTest() {
         // Prevent notification path from calling Android-only APIs
         every { context.packageManager.getLaunchIntentForPackage(any()) } returns null
 
+        languagePreferences = mockk(relaxed = true)
+        networkMonitor = mockk(relaxed = true)
+        every { networkMonitor.isOnline } returns MutableStateFlow(true)
+
         viewModel = ChatViewModel(
             chatRepository, voiceRepository, settingsRepository, authRepository,
             userProfileRepository, processTeachingResponseUseCase, solveRepository,
-            agentRepository, context
+            agentRepository, languagePreferences, networkMonitor, context
         )
     }
 
