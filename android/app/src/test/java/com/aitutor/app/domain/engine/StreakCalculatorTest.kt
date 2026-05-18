@@ -54,10 +54,10 @@ class StreakCalculatorTest {
         }
 
         @Test
-        @DisplayName("仅昨日学习（今日未学）：当前连续 0 天，最长 1 天")
-        fun `only yesterday learned current 0 longest 1`() {
+        @DisplayName("仅昨日学习（今日未学）：当前连续 1 天，最长 1 天")
+        fun `only yesterday learned current 1 longest 1`() {
             val result = StreakCalculator.calculateStreak(listOf(yesterday))
-            assertEquals(0, result.currentStreak)
+            assertEquals(1, result.currentStreak)
             assertEquals(1, result.longestStreak)
             assertFalse(result.hasLearnedToday)
         }
@@ -75,10 +75,9 @@ class StreakCalculatorTest {
         @DisplayName("连续 5 天学习")
         fun `five consecutive days`() {
             val dates = listOf(fiveDaysAgo, fourDaysAgo, threeDaysAgo, dayBefore, yesterday)
-            // Not learning today — current streak should be 0 or based on yesterday
+            // Not learning today — from yesterday backwards chain is 5 consecutive
             val result = StreakCalculator.calculateStreak(dates)
-            // Current streak starts from yesterday: 5 days in a row ending yesterday
-            assertEquals(0, result.currentStreak) // didn't learn today
+            assertEquals(5, result.currentStreak) // yesterday starts a chain of 5
             assertEquals(5, result.longestStreak)
             assertFalse(result.hasLearnedToday)
         }

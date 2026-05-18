@@ -216,7 +216,7 @@ class ChatViewModelTest : BaseViewModelTest() {
         coEvery { chatRepository.getConversationById(any()) } returns Conversation(id = convId, title = "")
         coEvery { chatRepository.updateConversationTitle(any(), any()) } returns Unit
         coEvery { chatRepository.updateMessageStatus(any(), any()) } returns Unit
-        every { chatRepository.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns emptyFlow()
+        every { chatRepository.streamChat(any(), any(), any(), any(), any(), any(), any(), any(), any(), any()) } returns emptyFlow()
         viewModel.selectConversation(convId)
         viewModel.retrySend()
         coVerify { chatRepository.updateMessageStatus(10L, MessageStatus.SENT) }
