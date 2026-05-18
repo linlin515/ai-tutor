@@ -16,6 +16,8 @@ interface ChatRepository {
 
     // Message operations
     fun getMessagesByConversation(conversationId: Long): Flow<List<ChatMessage>>
+    suspend fun getMessagesPaged(conversationId: Long, limit: Int = 50, offset: Int = 0): List<ChatMessage>
+    suspend fun getMessageCount(conversationId: Long): Int
     suspend fun insertMessage(message: ChatMessage): Long
     suspend fun updateMessageStatus(id: Long, status: MessageStatus)
     suspend fun deleteAllMessages(conversationId: Long)

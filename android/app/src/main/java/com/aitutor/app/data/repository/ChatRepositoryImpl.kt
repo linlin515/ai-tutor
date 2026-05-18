@@ -77,8 +77,18 @@ class ChatRepositoryImpl @Inject constructor(
 
     override fun getMessagesByConversation(conversationId: Long): Flow<List<ChatMessage>> {
         return messageDao.getByConversationFlow(conversationId).map { entities ->
-            entities.map { it.toDomain() }
+            entities.map { it.toDomain() }.reversed() // DAO returns DESC, we want ASC for display
         }
+    }
+
+    override suspend fun getMessagesPaged(conversationId: Long, limit: Int, offset: Int): List<ChatMessage> {
+        return messageDao.getByConversationPaged(conversationId, limit, offset)
+            .map { it.toDomain() }
+            .reversed() // DAO returns DESC, but we want chronological order
+    }
+
+    override suspend fun getMessageCount(conversationId: Long): Int {
+        return messageDao.getMessageCount(conversationId)
     }
 
     override suspend fun insertMessage(message: ChatMessage): Long {

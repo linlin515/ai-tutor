@@ -263,12 +263,11 @@ fun SettingsScreen(
             } catch (e: Exception) { null }
         }
         val versionName = packageInfo?.versionName ?: "1.0.0"
-        val versionCode = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            packageInfo?.longVersionCode ?: 1
-        } else {
-            @Suppress("DEPRECATION")
-            packageInfo?.versionCode?.toLong() ?: 1
-        }
+        val versionCode = packageInfo?.let {
+            try {
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(it)
+            } catch (e: Exception) { 1L }
+        } ?: 1L
 
         ListItem(
             headlineContent = { Text("版本") },

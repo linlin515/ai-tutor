@@ -54,7 +54,7 @@ fun LeaderboardView(
                         .heightIn(max = 300.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    items(rankings) { entry ->
+                    items(rankings, key = { it.rank }) { entry ->
                         LeaderboardRow(entry = entry)
                     }
                 }

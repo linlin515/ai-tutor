@@ -102,9 +102,9 @@ class ChatRepositoryImplTest {
         every { messageDao.getByConversationFlow(1L) } returns flowOf(entities)
         val result = repository.getMessagesByConversation(1L).first()
         assertEquals(2, result.size)
-        assertTrue(result[0].isUser)
-        assertEquals("你好", result[0].content)
-        assertFalse(result[1].isUser)
+        assertFalse(result[0].isUser) // reversed: last message (AI reply) now first
+        assertEquals("你好！有什么可以帮助你的？", result[0].content)
+        assertTrue(result[1].isUser)
     }
 
     @Test

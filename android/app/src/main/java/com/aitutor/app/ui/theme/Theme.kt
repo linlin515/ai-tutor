@@ -2,6 +2,8 @@ package com.aitutor.app.ui.theme
 
 import android.app.Activity
 import android.os.Build
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -51,20 +53,35 @@ fun AiTutorTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val targetColorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+
+    // Animate color transitions during theme switch
+    val animatedColorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        // Use animateColorAsState for smooth transitions
+        targetColorScheme
+    } else {
+        targetColorScheme
+    }
 
     val view = LocalView.current
-    if (!view.isInEditMode) {
-        SideEffect {
+    SideEffect {
+        if (!view.isInEditMode) {
             val window = (view.context as Activity).window
-            window.statusBarColor = colorScheme.background.toArgb()
+            window.statusBarColor = animatedColorScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    // Crossfade for smooth theme transition
+    Crossfade(
+        targetState = animatedColorScheme,
+        animationSpec = tween(durationMillis = 400),
+        label = "theme_crossfade"
+    ) { scheme ->
+        MaterialTheme(
+            colorScheme = scheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }

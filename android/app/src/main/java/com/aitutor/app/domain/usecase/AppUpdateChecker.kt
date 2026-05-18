@@ -63,12 +63,9 @@ class AppUpdateChecker @Inject constructor(
                 context.packageName,
                 0
             )
-            val localVersionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                packageInfo.longVersionCode
-            } else {
-                @Suppress("DEPRECATION")
-                packageInfo.versionCode.toLong()
-            }
+            val localVersionCode = try {
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(packageInfo)
+            } catch (e: Exception) { 1L }
             val localVersionName = packageInfo.versionName ?: "1.0.0"
 
             // 请求远程版本 API

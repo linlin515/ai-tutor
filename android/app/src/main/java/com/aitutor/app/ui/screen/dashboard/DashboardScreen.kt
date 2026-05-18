@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.ui.common.EmptyStateView
+import com.aitutor.app.ui.components.DashboardSkeleton
 import com.aitutor.app.ui.screen.dashboard.components.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -31,7 +32,10 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (uiState.isEmpty && !uiState.isLoading) {
+            if (uiState.isLoading && uiState.isEmpty) {
+                // Skeleton loading state
+                DashboardSkeleton()
+            } else if (uiState.isEmpty && !uiState.isLoading) {
                 EmptyStateView(
                     title = "开始学习吧！",
                     subtitle = "去聊天或解题，这里将展示你的学习统计数据。",
