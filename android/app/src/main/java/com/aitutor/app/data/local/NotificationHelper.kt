@@ -94,6 +94,34 @@ object NotificationHelper {
     }
 
     /**
+     * 发送鼓励通知（没有待复习题目时）。
+     */
+    fun sendEncouragementNotification(context: Context) {
+        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        } ?: return
+
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            2002,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, NotificationChannels.CHANNEL_SYSTEM)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("学习提醒")
+            .setContentText("今日错题已全部掌握，继续保持！")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("今日错题已全部掌握，继续保持！去学习新知识吧~"))
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .setContentIntent(pendingIntent)
+            .build()
+
+        notifySafe(context, 2002, notification)
+    }
+
+    /**
      * 发送配额超限通知。
      */
     fun sendQuotaExceededNotification(

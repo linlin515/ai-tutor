@@ -46,6 +46,10 @@ class SettingsRepositoryImpl @Inject constructor(
         settingsDataStore.updateTtsVoice(voice)
     }
 
+    override suspend fun updateDailyReminder(enabled: Boolean, hour: Int, minute: Int) {
+        settingsDataStore.updateDailyReminder(enabled, hour, minute)
+    }
+
     override suspend fun getSyncSettings(): AppSettings {
         return settingsDataStore.settingsFlow.first()
     }

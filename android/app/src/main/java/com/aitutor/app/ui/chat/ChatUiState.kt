@@ -38,5 +38,7 @@ data class ChatUiState(
     val agentState: AgentState = AgentState.IDLE,
     val showAgentSwitch: Boolean = false,
     // P1-2: Network state
-    val isOnline: Boolean = true
+    val isOnline: Boolean = true,
+    // v2.5 F1: Message long-press feedback target
+    val feedbackTargetMessageId: Long? = null
 )

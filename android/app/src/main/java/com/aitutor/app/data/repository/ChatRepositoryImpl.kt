@@ -334,6 +334,24 @@ class ChatRepositoryImpl @Inject constructor(
         conversationDao.deleteAll()
     }
 
+    // ===== v2.5 F2: Feedback =====
+
+    override suspend fun updateMessageFeedback(id: Long, feedback: String?) {
+        messageDao.updateFeedback(id, feedback)
+    }
+
+    // ===== v2.5 F3: Favorites =====
+
+    override suspend fun toggleFavorite(id: Long, isFavorite: Boolean) {
+        messageDao.updateFavorite(id, isFavorite)
+    }
+
+    override fun getFavoriteMessages(): Flow<List<ChatMessage>> {
+        return messageDao.getFavorites().map { entities ->
+            entities.map { it.toDomain() }
+        }
+    }
+
     // ===== Helpers =====
 
     private fun buildMessageDtos(

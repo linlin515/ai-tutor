@@ -36,4 +36,16 @@ interface MessageDao {
 
     @Query("SELECT * FROM messages WHERE content LIKE '%' || :keyword || '%' ORDER BY timestamp DESC")
     fun searchByContent(keyword: String): Flow<List<MessageEntity>>
+
+    // v2.5 F2: Update feedback
+    @Query("UPDATE messages SET feedback = :feedback WHERE id = :id")
+    suspend fun updateFeedback(id: Long, feedback: String?)
+
+    // v2.5 F3: Update favorite
+    @Query("UPDATE messages SET isFavorite = :isFavorite WHERE id = :id")
+    suspend fun updateFavorite(id: Long, isFavorite: Boolean)
+
+    // v2.5 F3: Get favorite messages
+    @Query("SELECT * FROM messages WHERE isFavorite = 1 ORDER BY timestamp DESC")
+    fun getFavorites(): Flow<List<MessageEntity>>
 }

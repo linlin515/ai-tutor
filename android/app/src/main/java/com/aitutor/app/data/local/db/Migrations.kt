@@ -194,3 +194,14 @@ val MIGRATION_3_4 = Migration(3, 4) { db ->
         """.trimIndent()
     )
 }
+
+/**
+ * Room database migration from version 4 to 5.
+ *
+ * v4: all previous tables
+ * v5: +feedback (TEXT, nullable) and +isFavorite (INTEGER, default 0) on messages
+ */
+val MIGRATION_4_5 = Migration(4, 5) { db ->
+    db.execSQL("ALTER TABLE messages ADD COLUMN feedback TEXT DEFAULT NULL")
+    db.execSQL("ALTER TABLE messages ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
+}

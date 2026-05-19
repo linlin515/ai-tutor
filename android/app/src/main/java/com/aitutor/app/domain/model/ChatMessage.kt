@@ -13,7 +13,11 @@ data class ChatMessage(
     val agentStepType: AgentStepType? = null,  // Agent 步骤类型
     val toolName: String? = null,              // 工具名称（如 web_search）
     val toolQuery: String? = null,             // 工具的输入参数
-    val toolResult: String? = null             // 工具的返回结果
+    val toolResult: String? = null,            // 工具的返回结果
+    // v2.5 F2: AI 回复反馈
+    val feedback: FeedbackType? = null,
+    // v2.5 F3: 收藏
+    val isFavorite: Boolean = false
 )
 
 enum class MessageType {
@@ -27,4 +31,9 @@ enum class MessageStatus {
     SENDING,
     SENT,
     FAILED
+}
+
+enum class FeedbackType {
+    POSITIVE,
+    NEGATIVE
 }

@@ -7,7 +7,10 @@ data class AppSettings(
     val maxTokens: Int = 2048,
     val darkTheme: ThemeMode = ThemeMode.SYSTEM,
     val ttsSpeed: Float = 1.0f,
-    val ttsVoice: String = "default"
+    val ttsVoice: String = "default",
+    val dailyReminderEnabled: Boolean = false,
+    val reminderHour: Int = 20,
+    val reminderMinute: Int = 0
 )
 
 enum class ThemeMode {

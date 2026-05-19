@@ -79,4 +79,11 @@ interface ChatRepository {
 
     // Clear all
     suspend fun clearAll()
+
+    // v2.5 F2: Message feedback
+    suspend fun updateMessageFeedback(id: Long, feedback: String?)
+
+    // v2.5 F3: Favorite
+    suspend fun toggleFavorite(id: Long, isFavorite: Boolean)
+    fun getFavoriteMessages(): Flow<List<ChatMessage>>
 }

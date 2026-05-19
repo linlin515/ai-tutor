@@ -396,7 +396,14 @@ fun ChatScreen(
                                     if (!message.isUser && message.content.isNotEmpty()) {
                                         viewModel.speakText(message.content)
                                     }
-                                }
+                                },
+                                // v2.5 F1: Long-press menu callbacks
+                                onCopy = { content -> viewModel.copyMessage(content) },
+                                onFavorite = { id -> viewModel.toggleFavorite(id) },
+                                onFeedback = { id -> viewModel.setFeedbackTarget(id) },
+                                // v2.5 F2: Thumbs up/down
+                                onThumbsUp = { id -> viewModel.submitFeedback(id, true) },
+                                onThumbsDown = { id -> viewModel.submitFeedback(id, false) }
                             )
                         }
                     }

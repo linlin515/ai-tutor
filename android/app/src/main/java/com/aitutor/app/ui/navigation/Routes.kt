@@ -18,6 +18,7 @@ object Routes {
     const val USER_AGREEMENT = "user_agreement"
     const val CRASH_LOG = "crash_log"
     const val ONBOARDING = "onboarding"
+    const val FAVORITES = "favorites"
 
     fun chatConversation(conversationId: Long) = "chat/$conversationId"
 }

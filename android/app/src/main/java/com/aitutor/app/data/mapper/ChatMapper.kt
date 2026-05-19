@@ -4,6 +4,7 @@ import com.aitutor.app.data.local.entity.ConversationEntity
 import com.aitutor.app.data.local.entity.MessageEntity
 import com.aitutor.app.domain.model.ChatMessage
 import com.aitutor.app.domain.model.Conversation
+import com.aitutor.app.domain.model.FeedbackType
 import com.aitutor.app.domain.model.MessageStatus
 import com.aitutor.app.domain.model.MessageType
 
@@ -43,7 +44,15 @@ fun MessageEntity.toDomain(): ChatMessage = ChatMessage(
     } catch (e: Exception) {
         MessageStatus.SENT
     },
-    metadata = metadata
+    metadata = metadata,
+    // v2.5 F2: parse feedback
+    feedback = try {
+        feedback?.let { FeedbackType.valueOf(it) }
+    } catch (e: Exception) {
+        null
+    },
+    // v2.5 F3: favorite
+    isFavorite = isFavorite
 )
 
 fun ChatMessage.toEntity(): MessageEntity = MessageEntity(
@@ -54,5 +63,9 @@ fun ChatMessage.toEntity(): MessageEntity = MessageEntity(
     contentType = contentType.name,
     timestamp = timestamp,
     status = status.name,
-    metadata = metadata
+    metadata = metadata,
+    // v2.5 F2: serialize feedback
+    feedback = feedback?.name,
+    // v2.5 F3: favorite
+    isFavorite = isFavorite
 )

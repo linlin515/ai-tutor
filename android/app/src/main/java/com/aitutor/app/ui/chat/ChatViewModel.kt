@@ -728,6 +728,49 @@ class ChatViewModel @Inject constructor(
         voiceRepository.stopSpeaking()
     }
 
+    // ===== v2.5 F1: Long-press operations =====
+
+    fun copyMessage(content: String) {
+        val clipboard = appContext.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+        val clip = android.content.ClipData.newPlainText("message", content)
+        clipboard.setPrimaryClip(clip)
+        android.widget.Toast.makeText(appContext, "已复制到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
+    }
+
+    fun setFeedbackTarget(messageId: Long) {
+        uiState = uiState.copy(feedbackTargetMessageId = messageId)
+    }
+
+    fun clearFeedbackTarget() {
+        uiState = uiState.copy(feedbackTargetMessageId = null)
+    }
+
+    // ===== v2.5 F2: Feedback =====
+
+    fun submitFeedback(messageId: Long, positive: Boolean) {
+        viewModelScope.launch {
+            val feedback = if (positive) "POSITIVE" else "NEGATIVE"
+            chatRepository.updateMessageFeedback(messageId, feedback)
+            // Show toast
+            val label = if (positive) "👍 感谢反馈" else "👎 感谢反馈"
+            android.widget.Toast.makeText(appContext, label, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // ===== v2.5 F3: Favorite =====
+
+    fun toggleFavorite(messageId: Long) {
+        viewModelScope.launch {
+            // Read current message to get its favorite status
+            val messages = uiState.messages
+            val msg = messages.find { it.id == messageId } ?: return@launch
+            val newFavorite = !msg.isFavorite
+            chatRepository.toggleFavorite(messageId, newFavorite)
+            val label = if (newFavorite) "⭐ 已收藏" else "已取消收藏"
+            android.widget.Toast.makeText(appContext, label, android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun fetchSolveSteps(question: String) {
         if (question.isBlank()) return
         viewModelScope.launch {

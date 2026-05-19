@@ -18,6 +18,7 @@ import com.aitutor.app.data.local.db.AiTutorDatabase
 import com.aitutor.app.data.local.db.MIGRATION_1_2
 import com.aitutor.app.data.local.db.MIGRATION_2_3
 import com.aitutor.app.data.local.db.MIGRATION_3_4
+import com.aitutor.app.data.local.db.MIGRATION_4_5
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,7 +38,7 @@ object DatabaseModule {
             AiTutorDatabase::class.java,
             "aitutor_database"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .build()
     }
 

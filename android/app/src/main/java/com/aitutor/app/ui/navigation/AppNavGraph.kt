@@ -29,6 +29,7 @@ import com.aitutor.app.ui.camera.CameraScreen
 import com.aitutor.app.ui.chat.ChatScreen
 import com.aitutor.app.ui.auth.LoginScreen
 import com.aitutor.app.ui.auth.LoginViewModel
+import com.aitutor.app.ui.favorites.FavoritesScreen
 import com.aitutor.app.ui.onboarding.OnboardingScreen
 import com.aitutor.app.ui.profile.ProfileScreen
 import com.aitutor.app.ui.report.ReportExportScreen
@@ -223,6 +224,9 @@ fun AppNavGraph(
                     },
                     onNavigateToCrashLog = {
                         navController.navigate(Routes.CRASH_LOG)
+                    },
+                    onNavigateToFavorites = {
+                        navController.navigate(Routes.FAVORITES)
                     }
                 )
             }
@@ -282,6 +286,13 @@ fun AppNavGraph(
 
             composable(Routes.REPORT) {
                 ReportExportScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v2.5 F3: Favorites screen
+            composable(Routes.FAVORITES) {
+                FavoritesScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

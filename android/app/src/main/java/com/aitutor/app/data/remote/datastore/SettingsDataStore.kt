@@ -26,6 +26,9 @@ class SettingsDataStore @Inject constructor(
         private val KEY_THEME_MODE = stringPreferencesKey("theme_mode")
         private val KEY_TTS_SPEED = floatPreferencesKey("tts_speed")
         private val KEY_TTS_VOICE = stringPreferencesKey("tts_voice")
+        private val KEY_DAILY_REMINDER = booleanPreferencesKey("daily_reminder_enabled")
+        private val KEY_REMINDER_HOUR = intPreferencesKey("reminder_hour")
+        private val KEY_REMINDER_MINUTE = intPreferencesKey("reminder_minute")
     }
 
     val settingsFlow: Flow<AppSettings> = context.settingsDataStore.data.map { prefs ->
@@ -36,7 +39,10 @@ class SettingsDataStore @Inject constructor(
             maxTokens = prefs[KEY_MAX_TOKENS] ?: 2048,
             darkTheme = parseThemeMode(prefs[KEY_THEME_MODE] ?: "SYSTEM"),
             ttsSpeed = prefs[KEY_TTS_SPEED] ?: 1.0f,
-            ttsVoice = prefs[KEY_TTS_VOICE] ?: "default"
+            ttsVoice = prefs[KEY_TTS_VOICE] ?: "default",
+            dailyReminderEnabled = prefs[KEY_DAILY_REMINDER] ?: false,
+            reminderHour = prefs[KEY_REMINDER_HOUR] ?: 20,
+            reminderMinute = prefs[KEY_REMINDER_MINUTE] ?: 0
         )
     }
 
@@ -79,6 +85,14 @@ class SettingsDataStore @Inject constructor(
     suspend fun updateTtsVoice(voice: String) {
         context.settingsDataStore.edit { prefs ->
             prefs[KEY_TTS_VOICE] = voice
+        }
+    }
+
+    suspend fun updateDailyReminder(enabled: Boolean, hour: Int, minute: Int) {
+        context.settingsDataStore.edit { prefs ->
+            prefs[KEY_DAILY_REMINDER] = enabled
+            prefs[KEY_REMINDER_HOUR] = hour
+            prefs[KEY_REMINDER_MINUTE] = minute
         }
     }
 

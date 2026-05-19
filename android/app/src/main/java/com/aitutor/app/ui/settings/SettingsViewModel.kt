@@ -3,8 +3,14 @@ package com.aitutor.app.ui.settings
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.work.Constraints
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.NetworkType
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import com.aitutor.app.data.local.CacheManager
 import com.aitutor.app.data.local.CacheSize
+import com.aitutor.app.data.local.reminder.StudyReminderWorker
 import com.aitutor.app.data.remote.datastore.LanguagePreferences
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
@@ -23,6 +29,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @HiltViewModel
@@ -154,6 +161,61 @@ class SettingsViewModel @Inject constructor(
             val newValue = !_agentEnabled.value
             agentRepository.setAgentEnabled(newValue)
         }
+    }
+
+    // F4: 学习提醒推送
+    fun toggleDailyReminder(enabled: Boolean) {
+        viewModelScope.launch {
+            val settings = settingsRepository.getSyncSettings()
+            settingsRepository.updateDailyReminder(enabled, settings.reminderHour, settings.reminderMinute)
+
+            if (enabled) {
+                scheduleStudyReminder(settings.reminderHour, settings.reminderMinute)
+            } else {
+                cancelStudyReminder()
+            }
+        }
+    }
+
+    private fun scheduleStudyReminder(hour: Int, minute: Int) {
+        val workManager = WorkManager.getInstance()
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.NOT_REQUIRED)
+            .build()
+
+        // 计算距离目标时间的延迟
+        val now = java.util.Calendar.getInstance()
+        val targetTime = java.util.Calendar.getInstance().apply {
+            set(java.util.Calendar.HOUR_OF_DAY, hour)
+            set(java.util.Calendar.MINUTE, minute)
+            set(java.util.Calendar.SECOND, 0)
+            set(java.util.Calendar.MILLISECOND, 0)
+            if (before(now)) {
+                add(java.util.Calendar.DAY_OF_MONTH, 1)
+            }
+        }
+        val initialDelayMinutes = (targetTime.timeInMillis - now.timeInMillis) / (1000 * 60)
+
+        val workRequest = PeriodicWorkRequestBuilder<StudyReminderWorker>(
+            24, TimeUnit.HOURS
+        )
+            .setConstraints(constraints)
+            .setInitialDelay(initialDelayMinutes, TimeUnit.MINUTES)
+            .addTag(StudyReminderWorker.WORK_NAME)
+            .build()
+
+        workManager.enqueueUniquePeriodicWork(
+            StudyReminderWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.UPDATE,
+            workRequest
+        )
+        Log.d("SettingsViewModel", "Scheduled daily reminder at $hour:$minute, initial delay ${initialDelayMinutes}min")
+    }
+
+    private fun cancelStudyReminder() {
+        val workManager = WorkManager.getInstance()
+        workManager.cancelUniqueWork(StudyReminderWorker.WORK_NAME)
+        Log.d("SettingsViewModel", "Cancelled daily reminder")
     }
 
     // ============================================================

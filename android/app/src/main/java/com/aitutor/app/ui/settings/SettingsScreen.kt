@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Security
@@ -47,6 +49,7 @@ fun SettingsScreen(
     onNavigateToPrivacyPolicy: () -> Unit = {},
     onNavigateToUserAgreement: () -> Unit = {},
     onNavigateToCrashLog: () -> Unit = {},
+    onNavigateToFavorites: () -> Unit = {},
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val settings by viewModel.settings.collectAsState()
@@ -255,6 +258,41 @@ fun SettingsScreen(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
+
+        // F4: 每日学习提醒开关
+        val reminderEnabled = settings.dailyReminderEnabled
+        ListItem(
+            headlineContent = { Text("每日学习提醒") },
+            supportingContent = {
+                Text(
+                    if (reminderEnabled) "每日 ${"%02d:%02d".format(settings.reminderHour, settings.reminderMinute)} 推送复习提醒"
+                    else "关闭后将不再推送学习提醒"
+                )
+            },
+            leadingContent = {
+                Icon(Icons.Default.Notifications, contentDescription = null)
+            },
+            trailingContent = {
+                Switch(
+                    checked = reminderEnabled,
+                    onCheckedChange = { viewModel.toggleDailyReminder(it) }
+                )
+            }
+        )
+
+        HorizontalDivider()
+
+        // v2.5 F3: 我的收藏入口
+        ListItem(
+            headlineContent = { Text("我的收藏") },
+            supportingContent = { Text("查看收藏的消息") },
+            leadingContent = {
+                Icon(Icons.Default.Favorite, contentDescription = null)
+            },
+            modifier = Modifier.clickable { onNavigateToFavorites() }
+        )
+
+        HorizontalDivider()
 
         // App version display
         val packageInfo = remember {

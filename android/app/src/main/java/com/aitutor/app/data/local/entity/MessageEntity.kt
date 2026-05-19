@@ -26,5 +26,9 @@ data class MessageEntity(
     val contentType: String = "TEXT",
     val timestamp: Long = System.currentTimeMillis(),
     val status: String = "SENT",
-    val metadata: String? = null
+    val metadata: String? = null,
+    // v2.5 F2: AI 回复反馈 (null / "POSITIVE" / "NEGATIVE")
+    val feedback: String? = null,
+    // v2.5 F3: 收藏
+    val isFavorite: Boolean = false
 )

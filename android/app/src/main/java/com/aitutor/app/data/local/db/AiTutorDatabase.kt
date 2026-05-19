@@ -42,7 +42,7 @@ import com.aitutor.app.data.local.entity.WrongAnswerEntity
         SubscriptionCacheEntity::class,
         PendingMessageEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AiTutorDatabase : RoomDatabase() {

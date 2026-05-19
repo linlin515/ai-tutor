@@ -156,6 +156,8 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.android.compiler)
     implementation(libs.hilt.navigation.compose)
+    implementation("androidx.hilt:hilt-work:1.1.0")
+    ksp("androidx.hilt:hilt-compiler:1.1.0")
 
     // Room
     implementation(libs.room.runtime)
@@ -194,6 +196,9 @@ dependencies {
 
     // Security
     implementation(libs.security.crypto)
+
+    // WorkManager
+    implementation("androidx.work:work-runtime-ktx:2.9.0")
 
     // Test
     testImplementation("junit:junit:4.13.2")
