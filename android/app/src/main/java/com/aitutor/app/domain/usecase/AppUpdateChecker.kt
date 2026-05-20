@@ -37,7 +37,7 @@ class AppUpdateChecker @Inject constructor(
 ) {
     companion object {
         private const val VERSION_API_URL =
-            "https://aitutor.googlecloud.ccwu.cc/api/v1/app/version"
+            "http://35.212.211.250:5100/api/v1/app/version"
         private const val COOLDOWN_MS = 5 * 60 * 1000L // 5 分钟冷却期
     }
 

@@ -87,7 +87,7 @@ class CloudTtsEngine @Inject constructor(
 ) {
     private val gson = Gson()
     private val jsonMediaType = "application/json".toMediaType()
-    private val baseUrl = "https://aitutor.googlecloud.ccwu.cc/"
+    private val baseUrl = "http://35.212.211.250:5100/"
 
     /**
      * 流式接收云端 TTS 音频块
