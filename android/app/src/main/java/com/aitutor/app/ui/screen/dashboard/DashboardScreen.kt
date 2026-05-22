@@ -6,17 +6,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.ui.common.EmptyStateView
 import com.aitutor.app.ui.components.DashboardSkeleton
 import com.aitutor.app.ui.screen.dashboard.components.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.ui.Alignment.Companion.CenterVertically
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel = hiltViewModel(),
-    onNavigateToQuiz: () -> Unit = {}
+    onNavigateToQuiz: () -> Unit = {},
+    onNavigateToWrongAnswers: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -51,6 +58,12 @@ fun DashboardScreen(
                 ) {
                     // Stats overview
                     StatsOverviewCard(stats = uiState.stats)
+
+                    // P1-5: Wrong answer entry card
+                    WrongAnswerEntryCard(
+                        count = uiState.wrongAnswerCount,
+                        onClick = onNavigateToWrongAnswers
+                    )
 
                     // Trend chart
                     TrendChart(
@@ -120,4 +133,69 @@ private fun getSubjectKey(displayName: String): String = when (displayName) {
     "语文" -> "chinese"
     "英语" -> "english"
     else -> displayName.lowercase()
+}
+
+@Composable
+private fun WrongAnswerEntryCard(
+    count: Int,
+    onClick: () -> Unit
+) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.3f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.MenuBook,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.size(28.dp)
+                )
+                Column {
+                    Text(
+                        text = "错题本",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (count > 0) "有 $count 道待复习" else "暂无错题",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            if (count > 0) {
+                BadgedBox(
+                    badge = {
+                        Badge(
+                            containerColor = MaterialTheme.colorScheme.error
+                        ) {
+                            Text(
+                                text = count.toString(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onError
+                            )
+                        }
+                    }
+                ) {
+                    // Empty spacer for badge positioning
+                    Spacer(modifier = Modifier.size(24.dp))
+                }
+            }
+        }
+    }
 }

@@ -37,6 +37,7 @@ import com.aitutor.app.ui.settings.CrashLogScreen
 import com.aitutor.app.ui.settings.SettingsScreen
 import com.aitutor.app.ui.settings.PrivacyPolicyScreen
 import com.aitutor.app.ui.settings.UserAgreementScreen
+import com.aitutor.app.ui.screen.wronganswer.WrongAnswerScreen
 import com.aitutor.app.ui.splash.SplashScreen
 import com.aitutor.app.ui.screen.dashboard.DashboardScreen
 import com.aitutor.app.ui.screen.quiz.QuizScreen
@@ -268,6 +269,9 @@ fun AppNavGraph(
                 DashboardScreen(
                     onNavigateToQuiz = {
                         navController.navigate(Routes.QUIZ)
+                    },
+                    onNavigateToWrongAnswers = {
+                        navController.navigate(Routes.WRONG_ANSWERS)
                     }
                 )
             }
@@ -293,6 +297,13 @@ fun AppNavGraph(
             // v2.5 F3: Favorites screen
             composable(Routes.FAVORITES) {
                 FavoritesScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v2.7 P1-5: Wrong Answers screen
+            composable(Routes.WRONG_ANSWERS) {
+                WrongAnswerScreen(
                     onBack = { navController.popBackStack() }
                 )
             }

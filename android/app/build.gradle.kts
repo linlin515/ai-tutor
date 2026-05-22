@@ -75,9 +75,9 @@ android {
                 logger.lifecycle("debug.keystore auto-generated successfully")
             }
             storeFile = keystoreFile
-            storePassword = System.getenv("KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
+            storePassword = System.getenv("KEYSTORE_PASSWORD") ?: "aitutor123"
+            keyAlias = System.getenv("KEY_ALIAS") ?: "aitutor"
+            keyPassword = System.getenv("KEY_PASSWORD") ?: "aitutor123"
         }
     }
 

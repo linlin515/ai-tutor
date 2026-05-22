@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.aitutor.app.domain.model.*
 import com.aitutor.app.domain.repository.AnalyticsRepository
 import com.aitutor.app.domain.repository.GamificationRepository
+import com.aitutor.app.domain.repository.WrongAnswerRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -23,13 +24,16 @@ data class DashboardUiState(
     val achievements: List<AchievementWithStatus> = emptyList(),
     val streak: StreakResult = StreakResult(),
     val rankings: List<RankEntry> = emptyList(),
-    val userScore: UserScore? = null
+    val userScore: UserScore? = null,
+    // P1-5 错题本
+    val wrongAnswerCount: Int = 0
 )
 
 @HiltViewModel
 class DashboardViewModel @Inject constructor(
     private val analyticsRepository: AnalyticsRepository,
-    private val gamificationRepository: GamificationRepository
+    private val gamificationRepository: GamificationRepository,
+    private val wrongAnswerRepository: WrongAnswerRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(DashboardUiState())
@@ -38,6 +42,7 @@ class DashboardViewModel @Inject constructor(
     init {
         loadDashboard()
         observeGamificationData()
+        observeWrongAnswerCount()
     }
 
     private fun observeGamificationData() {
@@ -63,6 +68,14 @@ class DashboardViewModel @Inject constructor(
         viewModelScope.launch {
             gamificationRepository.observeUserScore().collect { userScore ->
                 _uiState.update { it.copy(userScore = userScore) }
+            }
+        }
+    }
+
+    private fun observeWrongAnswerCount() {
+        viewModelScope.launch {
+            wrongAnswerRepository.getWrongAnswerCount().collect { count ->
+                _uiState.update { it.copy(wrongAnswerCount = count) }
             }
         }
     }
