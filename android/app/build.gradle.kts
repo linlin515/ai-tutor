@@ -197,6 +197,10 @@ dependencies {
     // Security
     implementation(libs.security.crypto)
 
+    // Paging 3
+    implementation(libs.paging.runtime)
+    implementation(libs.paging.compose)
+
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.0")
 

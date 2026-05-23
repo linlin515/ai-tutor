@@ -12,4 +12,7 @@ interface AuthRepository {
     suspend fun saveToken(token: String)
     suspend fun clearToken()
     fun isLoggedIn(): Boolean
+
+    // [v30] 获取当前已登录用户 ID（用于排行榜"我"的定位）
+    fun getCurrentUserId(): String?
 }

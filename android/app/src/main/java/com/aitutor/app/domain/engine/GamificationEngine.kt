@@ -13,8 +13,16 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import androidx.paging.Pager
+import androidx.paging.PagingConfig
+import androidx.paging.PagingData
+import com.aitutor.app.data.remote.api.GamificationApi
+import com.aitutor.app.data.repository.paging.LeaderboardPagingSource
+import com.aitutor.app.domain.model.LeaderboardType
+import com.aitutor.app.domain.repository.AuthRepository
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +33,10 @@ import javax.inject.Singleton
 class GamificationEngine @Inject constructor(
     private val achievementDao: AchievementDao,
     private val userScoreDao: UserScoreDao,
-    private val scoreLogDao: ScoreLogDao
+    private val scoreLogDao: ScoreLogDao,
+    private val gamificationApi: GamificationApi,
+    // [v30] 用于在 LeaderboardPagingSource 里定位"我"
+    private val authRepository: AuthRepository
 ) {
     private val _unlockAchievementFlow = MutableSharedFlow<Achievement>(extraBufferCapacity = 10)
     val unlockAchievementFlow: SharedFlow<Achievement> = _unlockAchievementFlow.asSharedFlow()
@@ -107,7 +118,49 @@ class GamificationEngine @Inject constructor(
     }
 
     /**
-     * 获取排行榜（本地版）
+     * [v30] 获取 Paging 3 排行榜流
+     * @param type      排行榜类型 (GLOBAL / FRIENDS)
+     * @param pageSize  每页条目数
+     */
+    fun getLeaderboardPaging(
+        type: LeaderboardType = LeaderboardType.GLOBAL,
+        pageSize: Int = 20
+    ): Flow<PagingData<RankEntry>> {
+        return Pager(
+            config = PagingConfig(
+                pageSize = pageSize,
+                enablePlaceholders = false,
+                prefetchDistance = 3,
+                maxSize = 200,
+                jumpThreshold = 1000
+            ),
+            pagingSourceFactory = {
+                LeaderboardPagingSource(
+                    gamificationApi = gamificationApi,
+                    type = type,
+                    // 获取当前用户 ID（来自加密存储，登录时写入）
+                    currentUserId = authRepository.getCurrentUserId().orEmpty()
+                )
+            }
+        ).flow
+    }
+
+    /**
+     * [v30 BugFix] 刷新排行榜（同步分数 + 通知云端刷新）
+     * 数据拉取由 PagingSource.load() 完成，此处仅触发同步逻辑
+     */
+    suspend fun refreshLeaderboard() {
+        try {
+            gamificationApi.syncScore()
+        } catch (_: Exception) {
+            // 证书/网络失败不中断刷新流程
+        }
+        // 丢弃 Pager：ViewModel 层在刷新时调用 .cachedIn() 新 scope
+        // 或通过 pagingItems.refresh() 由 Paging 3 framework 触发 PagingSource 新实例
+    }
+
+    /**
+     * 获取排行榜（本地版）— 保留旧接口兼容
      */
     fun getLeaderboard(type: LeaderboardType): Flow<List<RankEntry>> {
         return userScoreDao.getScore().map { score ->

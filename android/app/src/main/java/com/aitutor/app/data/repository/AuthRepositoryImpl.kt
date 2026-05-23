@@ -23,6 +23,7 @@ class AuthRepositoryImpl @Inject constructor(
             if (response.isSuccessful && body?.code == 0 && body.data != null) {
                 val authData = body.data
                 tokenManager.saveToken(authData.accessToken)
+                tokenManager.saveUserId(authData.userId)  // [v30] 保存 userId
                 Result.success(
                     User(
                         id = authData.userId,
@@ -51,6 +52,7 @@ class AuthRepositoryImpl @Inject constructor(
             if (response.isSuccessful && body?.code == 0 && body.data != null) {
                 val authData = body.data
                 tokenManager.saveToken(authData.accessToken)
+                tokenManager.saveUserId(authData.userId)  // [v30] 保存 userId
                 Result.success(
                     User(
                         id = authData.userId,
@@ -133,4 +135,6 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     override fun isLoggedIn(): Boolean = tokenManager.isLoggedIn()
+
+    override fun getCurrentUserId(): String? = tokenManager.getCurrentUserId()  // [v30]
 }

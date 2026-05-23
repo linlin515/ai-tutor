@@ -31,6 +31,14 @@ class TokenManager @Inject constructor(
         prefs.edit().putString(KEY_TOKEN, token).apply()
     }
 
+    fun getCurrentUserId(): String? {
+        return prefs.getString(KEY_USER_ID, null)
+    }
+
+    fun saveUserId(userId: String) {
+        prefs.edit().putString(KEY_USER_ID, userId).apply()
+    }
+
     fun clearToken() {
         prefs.edit().remove(KEY_TOKEN).apply()
     }
@@ -42,5 +50,6 @@ class TokenManager @Inject constructor(
     companion object {
         private const val PREFS_NAME = "aitutor_auth_encrypted"
         private const val KEY_TOKEN = "jwt_token"
+        private const val KEY_USER_ID = "current_user_id"
     }
 }
