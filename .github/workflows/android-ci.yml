@@ -29,7 +29,9 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          echo "=== Env check ==="
+          echo "KEYSTORE_PASSWORD set: $([ -n \"\$KEYSTORE_PASSWORD\" ] && echo YES || echo NO)"
+          ./gradlew assembleRelease --no-daemon --stacktrace
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
