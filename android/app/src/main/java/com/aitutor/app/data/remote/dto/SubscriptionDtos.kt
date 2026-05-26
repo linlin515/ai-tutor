@@ -50,3 +50,24 @@ data class ConsumeQuotaResponse(
     @SerializedName("success") val success: Boolean,
     @SerializedName("daily_quota") val dailyQuota: DailyQuotaDto? = null
 )
+
+/**
+ * 验证购买请求。
+ *
+ * POST /api/v1/subscription/verify
+ */
+data class VerifyPurchaseRequest(
+    @SerializedName("purchase_token") val purchaseToken: String,
+    @SerializedName("product_id") val productId: String
+)
+
+/**
+ * 验证购买响应。
+ */
+data class VerifyPurchaseResponse(
+    @SerializedName("plan_type") val planType: String = "free",
+    @SerializedName("is_active") val isActive: Boolean = false,
+    @SerializedName("start_date") val startDate: String? = null,
+    @SerializedName("end_date") val endDate: String? = null,
+    @SerializedName("days_remaining") val daysRemaining: Int? = null
+)

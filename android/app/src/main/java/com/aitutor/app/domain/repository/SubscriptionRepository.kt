@@ -1,5 +1,6 @@
 package com.aitutor.app.domain.repository
 
+import com.aitutor.app.data.billing.PurchaseResult
 import com.aitutor.app.domain.model.FeatureType
 import com.aitutor.app.domain.model.QuotaResult
 import com.aitutor.app.domain.model.SubscriptionState
@@ -21,4 +22,10 @@ interface SubscriptionRepository {
 
     /** 从服务器刷新订阅状态 */
     suspend fun refreshStatus(): Result<SubscriptionState>
+
+    /** 验证购买（调后端 verify API） */
+    suspend fun verifyPurchase(purchaseToken: String, productId: String): Result<SubscriptionState>
+
+    /** 恢复已购买的订阅 */
+    suspend fun restorePurchases(): Result<List<PurchaseResult>>
 }

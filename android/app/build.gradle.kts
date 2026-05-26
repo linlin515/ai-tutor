@@ -194,6 +194,10 @@ dependencies {
     // Gson
     implementation(libs.gson)
 
+    // Billing
+    implementation("com.android.billingclient:billing:5.2.1")
+    implementation("com.android.billingclient:billing-ktx:5.2.1")
+
     // Security
     implementation(libs.security.crypto)
 

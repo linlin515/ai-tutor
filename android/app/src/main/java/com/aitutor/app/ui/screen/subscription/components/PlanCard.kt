@@ -26,6 +26,7 @@ fun PlanCard(
     isCurrentPlan: Boolean,
     accentColor: Color,
     onSubscribe: () -> Unit,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -114,7 +115,7 @@ fun PlanCard(
             // 订阅/当前方案按钮
             Button(
                 onClick = onSubscribe,
-                enabled = !isCurrentPlan,
+                enabled = !isCurrentPlan && !isLoading,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -124,11 +125,19 @@ fun PlanCard(
                     disabledContainerColor = MaterialTheme.colorScheme.surfaceVariant
                 )
             ) {
-                Text(
-                    text = if (isCurrentPlan) "当前方案" else "立即订阅",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text(
+                        text = if (isCurrentPlan) "当前方案" else "立即订阅",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }

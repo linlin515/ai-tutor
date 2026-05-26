@@ -4,6 +4,8 @@ import com.aitutor.app.data.remote.dto.ApiResponse
 import com.aitutor.app.data.remote.dto.ConsumeQuotaRequest
 import com.aitutor.app.data.remote.dto.ConsumeQuotaResponse
 import com.aitutor.app.data.remote.dto.SubscriptionStatusDto
+import com.aitutor.app.data.remote.dto.VerifyPurchaseRequest
+import com.aitutor.app.data.remote.dto.VerifyPurchaseResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -19,4 +21,7 @@ interface SubscriptionApi {
 
     @POST("api/v1/subscription/consume")
     suspend fun consumeQuota(@Body request: ConsumeQuotaRequest): Response<ApiResponse<ConsumeQuotaResponse>>
+
+    @POST("api/v1/subscription/verify")
+    suspend fun verifyPurchase(@Body request: VerifyPurchaseRequest): Response<ApiResponse<VerifyPurchaseResponse>>
 }

@@ -1,9 +1,12 @@
 package com.aitutor.app.data.repository
 
+import com.aitutor.app.data.billing.BillingManager
+import com.aitutor.app.data.billing.PurchaseResult
 import com.aitutor.app.data.local.dao.SubscriptionCacheDao
 import com.aitutor.app.data.local.entity.SubscriptionCacheEntity
 import com.aitutor.app.data.remote.api.SubscriptionApi
 import com.aitutor.app.data.remote.dto.SubscriptionStatusDto
+import com.aitutor.app.data.remote.dto.VerifyPurchaseRequest
 import com.aitutor.app.domain.model.*
 import com.aitutor.app.domain.repository.SubscriptionRepository
 import com.google.gson.Gson
@@ -19,7 +22,8 @@ import javax.inject.Singleton
 class SubscriptionRepositoryImpl @Inject constructor(
     private val subscriptionApi: SubscriptionApi,
     private val subscriptionCacheDao: SubscriptionCacheDao,
-    private val gson: Gson
+    private val gson: Gson,
+    private val billingManager: BillingManager
 ) : SubscriptionRepository {
 
     override fun getSubscriptionState(): Flow<SubscriptionState> {
@@ -100,6 +104,60 @@ class SubscriptionRepositoryImpl @Inject constructor(
             // 网络错误：返回缓存数据
             val cached = subscriptionCacheDao.get()?.toDomain() ?: SubscriptionState()
             Result.success(cached)
+        }
+    }
+
+    override suspend fun verifyPurchase(purchaseToken: String, productId: String): Result<SubscriptionState> = withContext(Dispatchers.IO) {
+        try {
+            // 1. 先 acknowledge 购买
+            val acknowledged = billingManager.acknowledgePurchase(purchaseToken)
+            if (!acknowledged) {
+                return@withContext Result.failure(Exception("购买确认失败，请重试"))
+            }
+
+            // 2. 调后端 verify API
+            val response = subscriptionApi.verifyPurchase(
+                VerifyPurchaseRequest(
+                    purchaseToken = purchaseToken,
+                    productId = productId
+                )
+            )
+            val body = response.body()
+            if (response.isSuccessful && body?.data != null) {
+                val verifyData = body.data
+                // 将验证结果转换为 SubscriptionState 并更新缓存
+                val statusDto = SubscriptionStatusDto(
+                    planType = verifyData.planType,
+                    status = if (verifyData.isActive) "active" else "expired",
+                    validUntil = verifyData.endDate
+                )
+                val entity = statusDto.toEntity()
+                subscriptionCacheDao.insert(entity)
+                Result.success(entity.toDomain())
+            } else {
+                Result.failure(Exception(body?.message ?: "订阅验证失败 (${response.code()})"))
+            }
+        } catch (e: Exception) {
+            Result.failure(Exception("订阅验证请求失败: ${e.message}", e))
+        }
+    }
+
+    override suspend fun restorePurchases(): Result<List<PurchaseResult>> = withContext(Dispatchers.IO) {
+        try {
+            // 1. 确保 BillingClient 已连接
+            billingManager.connect()
+
+            // 2. 查询已有订阅
+            val purchases = billingManager.restorePurchases()
+            if (purchases.isNotEmpty()) {
+                // 对每个找到的订阅调用 verify
+                for (purchase in purchases) {
+                    verifyPurchase(purchase.purchaseToken, purchase.productId)
+                }
+            }
+            Result.success(purchases)
+        } catch (e: Exception) {
+            Result.failure(Exception("恢复购买失败: ${e.message}", e))
         }
     }
 
