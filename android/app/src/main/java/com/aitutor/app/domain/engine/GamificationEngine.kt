@@ -45,6 +45,9 @@ class GamificationEngine @Inject constructor(
      * 处理学习事件：积分计算、连续学习更新、成就检测
      */
     suspend fun onEvent(event: LearningEvent) {
+        // AppOpened 是纯无操作事件，不处理任何逻辑
+        if (event is LearningEvent.AppOpened) return
+
         // 1. 计算基础积分
         val baseScore = ScoreCalculator.calculateScore(event)
 
@@ -59,7 +62,6 @@ class GamificationEngine @Inject constructor(
         val todayStr = today.format(DateTimeFormatter.ISO_LOCAL_DATE)
 
         // 3. 更新学习日期记录，重新计算连续学习
-        if (event !is LearningEvent.AppOpened) {
             val learningDates = userScoreEntity.lastLearningDate
                 .takeIf { it.isNotEmpty() }
                 ?.split(",")
@@ -74,8 +76,8 @@ class GamificationEngine @Inject constructor(
             // 4. 重新计算连续学习
             val streakResult = StreakCalculator.calculateStreak(updatedDates)
 
-            // 5. 计算连续学习额外积分
-            val streakBonus = if (streakResult.hasLearnedToday && baseScore > 0) {
+            // 5. 计算连续学习额外积分（至少连续2天才开始奖励）
+            val streakBonus = if (streakResult.hasLearnedToday && baseScore > 0 && streakResult.currentStreak > 1) {
                 ScoreCalculator.calculateStreakBonus(streakResult.currentStreak)
             } else {
                 0
@@ -114,7 +116,6 @@ class GamificationEngine @Inject constructor(
             )
 
             checkAndUnlockAchievements(userScore)
-        }
     }
 
     /**
@@ -126,6 +127,8 @@ class GamificationEngine @Inject constructor(
         type: LeaderboardType = LeaderboardType.GLOBAL,
         pageSize: Int = 20
     ): Flow<PagingData<RankEntry>> {
+        // [v30] 预获取当前用户 ID，确保 getCurrentUserId() 被立即调用
+        val currentUserId = authRepository.getCurrentUserId().orEmpty()
         return Pager(
             config = PagingConfig(
                 pageSize = pageSize,
@@ -138,8 +141,7 @@ class GamificationEngine @Inject constructor(
                 LeaderboardPagingSource(
                     gamificationApi = gamificationApi,
                     type = type,
-                    // 获取当前用户 ID（来自加密存储，登录时写入）
-                    currentUserId = authRepository.getCurrentUserId().orEmpty()
+                    currentUserId = currentUserId
                 )
             }
         ).flow

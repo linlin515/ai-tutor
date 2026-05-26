@@ -43,6 +43,7 @@ class AuthRepositoryImplTest {
     fun login_success_shouldReturnUserAndSaveToken() = runTest {
         coEvery { api.login(any<AuthRequest>()) } returns Response.success(mockApiResponse)
         every { tokenManager.saveToken(any()) } returns Unit
+        every { tokenManager.saveUserId(any()) } returns Unit
 
         val result = repository.login("13800138000", "correctPass123")
 
@@ -54,7 +55,8 @@ class AuthRepositoryImplTest {
         assertEquals("测试用户", user.nickname)
         assertEquals(20, user.dailyQuota)
         assertEquals(3, user.dailyUsed)
-        verify { tokenManager.saveToken("eyJhbGciOiJIUzI1NiJ9.token") }
+        verify { tokenManager.saveToken(any()) }
+        verify { tokenManager.saveUserId("12345") }
         coVerify { api.login(AuthRequest("13800138000", "correctPass123")) }
     }
 
@@ -105,12 +107,14 @@ class AuthRepositoryImplTest {
     fun register_success_shouldReturnUserAndSaveToken() = runTest {
         coEvery { api.register(any<AuthRequest>()) } returns Response.success(mockApiResponse)
         every { tokenManager.saveToken(any()) } returns Unit
+        every { tokenManager.saveUserId(any()) } returns Unit
 
         val result = repository.register("13800138000", "newPass123", "test@example.com")
 
         assertTrue(result.isSuccess)
         assertEquals("12345", result.getOrNull()!!.id)
         verify { tokenManager.saveToken(any()) }
+        verify { tokenManager.saveUserId("12345") }
         coVerify { api.register(AuthRequest("13800138000", "newPass123", "test@example.com")) }
     }
 
@@ -118,10 +122,12 @@ class AuthRepositoryImplTest {
     fun register_withoutEmail_shouldWork() = runTest {
         coEvery { api.register(any<AuthRequest>()) } returns Response.success(mockApiResponse)
         every { tokenManager.saveToken(any()) } returns Unit
+        every { tokenManager.saveUserId(any()) } returns Unit
 
         val result = repository.register("13800138000", "newPass123", null)
 
         assertTrue(result.isSuccess)
+        verify { tokenManager.saveUserId("12345") }
         coVerify { api.register(AuthRequest("13800138000", "newPass123", null)) }
     }
 
