@@ -43,6 +43,9 @@ import com.aitutor.app.ui.chat.components.VoiceInputBar
 import com.aitutor.app.ui.common.EmptyStateView
 import com.aitutor.app.ui.components.NetworkBanner
 import com.aitutor.app.ui.conversation.ConversationListSheet
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -656,3 +659,9 @@ private data class StepInfo(
     val title: String,
     val content: String
 )
+
+// ===== Preview =====
+@Preview(name = "AI 对话 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "AI 对话 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewChatScreen() { AiTutorTheme { ChatScreen() } }
