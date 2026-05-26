@@ -16,6 +16,9 @@ import com.aitutor.app.domain.model.QuizConfig
 import com.aitutor.app.domain.model.QuizPhase
 import com.aitutor.app.domain.model.Question
 import com.aitutor.app.ui.screen.quiz.components.*
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +119,28 @@ fun QuizScreen(
                 }
             }
         }
+    }
+}
+
+// ===== Preview =====
+@Preview(
+    name = "测验页 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "测验页 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun QuizScreenPreview() {
+    AiTutorTheme {
+        QuizScreen(onBack = {})
     }
 }
 

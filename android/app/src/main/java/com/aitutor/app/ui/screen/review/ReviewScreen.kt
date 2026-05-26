@@ -15,6 +15,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.ui.screen.review.components.ReviewCard
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -225,4 +228,26 @@ private fun formatSubject(key: String): String = when (key) {
     "chinese" -> "语文"
     "english" -> "英语"
     else -> key
+}
+
+// ===== Preview =====
+@Preview(
+    name = "复习页 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "复习页 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun ReviewScreenPreview() {
+    AiTutorTheme {
+        ReviewScreen(onBack = {})
+    }
 }

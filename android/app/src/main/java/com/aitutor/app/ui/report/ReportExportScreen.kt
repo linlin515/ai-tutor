@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.domain.model.ReportType
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -258,5 +261,27 @@ fun ReportExportScreen(
                 }
             }
         }
+    }
+}
+
+// ===== Preview =====
+@Preview(
+    name = "报告导出 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "报告导出 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun ReportExportScreenPreview() {
+    AiTutorTheme {
+        ReportExportScreen(onBack = {})
     }
 }
