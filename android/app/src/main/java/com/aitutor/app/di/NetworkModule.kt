@@ -31,7 +31,7 @@ import javax.inject.Singleton
 @InstallIn(SingletonComponent::class)
 object NetworkModule {
 
-    private const val BASE_URL = "http://35.212.211.250:5100/"
+    private const val BASE_URL = "http://34.92.238.135:5100/"
 
     @Provides
     @Singleton
@@ -143,7 +143,7 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideWebSearchTool(okHttpClient: OkHttpClient): WebSearchTool {
-        val tool = WebSearchTool(okHttpClient, "http://35.212.211.250:5100")
+        val tool = WebSearchTool(okHttpClient, "http://34.92.238.135:5100")
         // 注册到全局 ToolRegistry
         ToolRegistry.register(tool)
         return tool
