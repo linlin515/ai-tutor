@@ -23,6 +23,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 import androidx.lifecycle.viewmodel.compose.viewModel
 import java.io.File
 
@@ -366,3 +369,9 @@ private fun shareCrashLog(context: android.content.Context, file: File, content:
         ).show()
     }
 }
+
+// ===== Preview =====
+@Preview(name = "崩溃日志 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "崩溃日志 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewCrashLogScreen() { AiTutorTheme { CrashLogScreen(onBack = {}) } }

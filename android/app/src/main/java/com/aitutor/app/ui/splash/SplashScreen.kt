@@ -21,6 +21,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @HiltViewModel
 class SplashViewModel @Inject constructor(
@@ -114,3 +117,9 @@ fun SplashScreen(
         }
     }
 }
+
+// ===== Preview =====
+@Preview(name = "启动屏 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "启动屏 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewSplashScreen() { AiTutorTheme { SplashScreen(onNavigateToLogin = {}, onNavigateToMain = {}) } }

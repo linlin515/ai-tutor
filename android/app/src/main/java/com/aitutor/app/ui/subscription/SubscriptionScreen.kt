@@ -338,23 +338,7 @@ fun FeatureComparisonRow(
 }
 
 // ===== Preview =====
-@Preview(
-    name = "订阅页 预览",
-    showBackground = true,
-    backgroundColor = 0xFF1C1B1F,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "订阅页 预览 (深色)",
-    showBackground = true,
-    backgroundColor = 0xFFFEFBFF,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+@Preview(name = "订阅页 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "订阅页 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun UiSubscriptionScreenPreview() {
-    AiTutorTheme {
-        com.aitutor.app.ui.subscription.SubscriptionScreen(onBack = {})
-    }
-}
+private fun PreviewSubscriptionScreen() { AiTutorTheme { SubscriptionScreen(onBack = {}) } }

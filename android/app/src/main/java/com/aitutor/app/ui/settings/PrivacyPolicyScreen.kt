@@ -187,23 +187,7 @@ internal fun BulletText(text: String) {
 }
 
 // ===== Preview =====
-@Preview(
-    name = "隐私政策 预览",
-    showBackground = true,
-    backgroundColor = 0xFF1C1B1F,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "隐私政策 预览 (深色)",
-    showBackground = true,
-    backgroundColor = 0xFFFEFBFF,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+@Preview(name = "隐私政策 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "隐私政策 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PrivacyPolicyScreenPreview() {
-    AiTutorTheme {
-        PrivacyPolicyScreen(onBack = {})
-    }
-}
+private fun PreviewPrivacyPolicyScreen() { AiTutorTheme { PrivacyPolicyScreen(onBack = {}) } }

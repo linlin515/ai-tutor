@@ -21,12 +21,15 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @Composable
 fun LoginScreen(
-    viewModel: LoginViewModel,
-    onLoginSuccess: () -> Unit
-) {
+    viewModel: LoginViewModel = hiltViewModel(),
+    onLoginSuccess: () -> Unit = {}) {
     val state = viewModel.uiState
     val focusManager = LocalFocusManager.current
     var passwordVisible by remember { mutableStateOf(false) }

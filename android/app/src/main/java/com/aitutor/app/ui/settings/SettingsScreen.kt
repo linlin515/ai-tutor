@@ -32,6 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 import com.aitutor.app.data.local.CacheSize
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.AppUpdateInfo
@@ -488,3 +491,9 @@ private fun SettingsSlider(
         }
     }
 }
+
+// ===== Preview =====
+@Preview(name = "设置 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "设置 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
+@Composable
+private fun PreviewSettingsScreen() { AiTutorTheme { SettingsScreen() } }

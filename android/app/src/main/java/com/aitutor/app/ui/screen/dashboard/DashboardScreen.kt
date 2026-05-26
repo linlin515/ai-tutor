@@ -17,6 +17,9 @@ import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.ui.Alignment.Companion.CenterVertically
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -121,6 +124,28 @@ fun DashboardScreen(
                 }
             }
         }
+    }
+}
+
+// ===== Preview =====
+@Preview(
+    name = "仪表盘 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "仪表盘 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun PreviewDashboardScreen() {
+    AiTutorTheme {
+        DashboardScreen(onNavigateToQuiz = {}, onNavigateToWrongAnswers = {})
     }
 }
 

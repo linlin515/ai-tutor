@@ -28,6 +28,9 @@ import com.aitutor.app.ui.screen.subscription.components.FeatureComparisonTable
 import com.aitutor.app.ui.screen.subscription.components.PlanCard
 import com.aitutor.app.ui.screen.subscription.components.QuotaExceededDialog
 import com.aitutor.app.ui.screen.subscription.components.QuotaProgressBar
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -296,5 +299,27 @@ fun SubscriptionScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+}
+
+// ===== Preview =====
+@Preview(
+    name = "订阅页 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "订阅页 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun PreviewSubscriptionScreen() {
+    AiTutorTheme {
+        SubscriptionScreen(onBack = {})
     }
 }

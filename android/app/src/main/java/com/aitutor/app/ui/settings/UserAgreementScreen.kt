@@ -138,23 +138,7 @@ fun UserAgreementScreen(onBack: () -> Unit) {
 }
 
 // ===== Preview =====
-@Preview(
-    name = "用户协议 预览",
-    showBackground = true,
-    backgroundColor = 0xFF1C1B1F,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "用户协议 预览 (深色)",
-    showBackground = true,
-    backgroundColor = 0xFFFEFBFF,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
+@Preview(name = "用户协议 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
+@Preview(name = "用户协议 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun UserAgreementScreenPreview() {
-    AiTutorTheme {
-        UserAgreementScreen(onBack = {})
-    }
-}
+private fun PreviewUserAgreementScreen() { AiTutorTheme { UserAgreementScreen(onBack = {}) } }
