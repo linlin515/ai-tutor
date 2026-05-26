@@ -8,6 +8,10 @@ from app.models.subscription import Subscription
 from app.models.question_record import QuestionRecord
 from app.models.daily_quota import DailyQuota
 from app.models.user_score import UserScore
+from app.models.quiz_record import QuizRecord
+from app.models.quiz_question import QuizQuestion
+from app.models.wrong_answer import WrongAnswer
+from app.models.achievement_record import AchievementRecord
 
 __all__ = [
     "User",
@@ -16,4 +20,8 @@ __all__ = [
     "QuestionRecord",
     "DailyQuota",
     "UserScore",
+    "QuizRecord",
+    "QuizQuestion",
+    "WrongAnswer",
+    "AchievementRecord",
 ]
