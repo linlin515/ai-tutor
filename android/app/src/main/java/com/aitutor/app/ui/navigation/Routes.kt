@@ -14,6 +14,8 @@ object Routes {
     const val QUIZ = "quiz"
     const val REVIEW = "review"
     const val REPORT = "report"
+    const val REPORT_EXPORT = "report_export"
+    const val FLASHCARD = "flashcard"
     const val PRIVACY_POLICY = "privacy_policy"
     const val USER_AGREEMENT = "user_agreement"
     const val CRASH_LOG = "crash_log"

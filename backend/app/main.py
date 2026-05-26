@@ -16,8 +16,9 @@ from fastapi.responses import JSONResponse
 from app.config import get_settings
 from app.database import close_db, init_db
 from app.middleware.content_safety import ContentSafetyMiddleware
-from app.routers import audio, auth, chat, chat_completions, game, health, models, solve, steps, subscription, user
+from app.routers import audio, auth, chat, chat_completions, game, health, models, report, solve, steps, subscription, user
 from app.routers import quiz, analytics
+from app.routers import flashcard, sync
 from app.schemas.common import error as api_error
 from app.services.redis_service import close_redis
 
@@ -104,10 +105,13 @@ app.include_router(chat_completions.router)
 app.include_router(solve.router)
 app.include_router(steps.router)
 app.include_router(subscription.router)
+app.include_router(report.router)      # 新增：学习报告导出路由
 app.include_router(audio.router)
 app.include_router(game.router)
 app.include_router(quiz.router)          # 新增：测验路由
 app.include_router(analytics.router)     # 新增：学习统计路由
+app.include_router(sync.router)          # 新增：离线同步路由
+app.include_router(flashcard.router)     # 新增：Flashcard 复习路由
 
 
 # ============================================================

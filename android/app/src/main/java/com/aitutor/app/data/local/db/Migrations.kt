@@ -205,3 +205,124 @@ val MIGRATION_4_5 = Migration(4, 5) { db ->
     db.execSQL("ALTER TABLE messages ADD COLUMN feedback TEXT DEFAULT NULL")
     db.execSQL("ALTER TABLE messages ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0")
 }
+
+/**
+ * Room database migration from version 5 to 6.
+ *
+ * v5: all previous tables
+ * v6: +cached_questions, +cached_wrong_answers, +cached_conversations, +offline_actions,
+ *     +flashcards, +flashcard_review_logs, +sync_metadata
+ */
+val MIGRATION_5_6 = Migration(5, 6) { db ->
+    // cached_questions
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `cached_questions` (
+            `id` TEXT NOT NULL,
+            `content` TEXT NOT NULL,
+            `options` TEXT NOT NULL DEFAULT '[]',
+            `correctAnswer` TEXT NOT NULL,
+            `explanation` TEXT NOT NULL DEFAULT '',
+            `category` TEXT NOT NULL DEFAULT '',
+            `difficulty` TEXT NOT NULL DEFAULT 'medium',
+            `cachedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+
+    // cached_wrong_answers
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `cached_wrong_answers` (
+            `id` TEXT NOT NULL,
+            `questionId` TEXT NOT NULL,
+            `questionContent` TEXT NOT NULL,
+            `userAnswer` TEXT NOT NULL,
+            `correctAnswer` TEXT NOT NULL,
+            `masteryScore` REAL NOT NULL DEFAULT 0.0,
+            `cachedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+
+    // cached_conversations
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `cached_conversations` (
+            `id` TEXT NOT NULL,
+            `sessionTitle` TEXT NOT NULL DEFAULT '',
+            `messages` TEXT NOT NULL DEFAULT '[]',
+            `cachedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+
+    // offline_actions
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `offline_actions` (
+            `id` TEXT NOT NULL,
+            `type` TEXT NOT NULL,
+            `targetId` TEXT NOT NULL DEFAULT '',
+            `payload` TEXT NOT NULL DEFAULT '{}',
+            `createdAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+
+    // flashcards (with unique index on sourceId)
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `flashcards` (
+            `id` TEXT NOT NULL,
+            `sourceId` TEXT NOT NULL,
+            `question` TEXT NOT NULL,
+            `options` TEXT NOT NULL DEFAULT '[]',
+            `correctAnswer` TEXT NOT NULL,
+            `explanation` TEXT NOT NULL DEFAULT '',
+            `category` TEXT NOT NULL DEFAULT '',
+            `difficulty` TEXT NOT NULL DEFAULT 'medium',
+            `masteryLevel` REAL NOT NULL DEFAULT 0.0,
+            `intervalDays` INTEGER NOT NULL DEFAULT 1,
+            `nextReviewAt` INTEGER NOT NULL,
+            `createdAt` INTEGER NOT NULL,
+            `updatedAt` INTEGER NOT NULL,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+    db.execSQL(
+        "CREATE UNIQUE INDEX IF NOT EXISTS `index_flashcards_sourceId` ON `flashcards` (`sourceId`)"
+    )
+
+    // flashcard_review_logs
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `flashcard_review_logs` (
+            `id` TEXT NOT NULL,
+            `flashcardId` TEXT NOT NULL,
+            `userId` TEXT NOT NULL DEFAULT '',
+            `rating` INTEGER NOT NULL,
+            `reviewedAt` INTEGER NOT NULL,
+            `synced` INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY(`id`)
+        )
+        """.trimIndent()
+    )
+
+    // sync_metadata
+    db.execSQL(
+        """
+        CREATE TABLE IF NOT EXISTS `sync_metadata` (
+            `key` TEXT NOT NULL,
+            `value` TEXT NOT NULL,
+            PRIMARY KEY(`key`)
+        )
+        """.trimIndent()
+    )
+}

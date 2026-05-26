@@ -67,4 +67,12 @@ class NetworkMonitor @Inject constructor(
             NetworkCapabilities.NET_CAPABILITY_INTERNET
         ) ?: false
     }
+
+    /**
+     * Get a snapshot of the current online state as a Flow that emits once.
+     */
+    fun getOnlineSnapshot(): Flow<Boolean> = callbackFlow {
+        trySend(isCurrentlyOnline())
+        close()
+    }
 }

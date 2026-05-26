@@ -18,22 +18,16 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./ai_tutor.db"
 
     # Redis 缓存
-    redis_url: str = ""  # Docker 部署时为 redis://redis:6379/0
+    redis_url: str = ""  # Docker 部署时为 redis://redis:***@lru_cache()
 
-    # new-api 代理配置（兼容 OpenAI API 格式）
-    new_api_base_url: str = "http://localhost:3000/v1"
-    new_api_key: str = "sk-you...here"
-
-    # OCR
-    ocr_enabled: bool = True
+    # AI 服务
+    new_api_base_url: str = "http://localhost:3000/v1"  # new-api 服务地址
+    new_api_key: str = ""
 
     # JWT
-    secret_key: str = ""  # 若为空，启动时会自动生成随机密钥
+    secret_key: str = secrets.token_urlsafe(32)
     jwt_algorithm: str = "HS256"
-    jwt_expiration_hours: int = 72
-
-    # AI 模型
-    default_ai_model: str = "gpt-4o-mini"
+    jwt_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     # CORS
     cors_origins: list[str] = ["*"]
@@ -41,9 +35,11 @@ class Settings(BaseSettings):
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
 
-    # 配额
-    daily_quota_free: int = 5
-    daily_quota_premium: int = 50
+    # TTS 配置
+    tts_default_provider: str = "edge"  # edge / openai
+    tts_edge_enabled: bool = True
+    tts_openai_enabled: bool = True
+    tts_max_text_length: int = 1024  # 单次合成最大字符数
 
     # 日志
     log_level: str = "INFO"

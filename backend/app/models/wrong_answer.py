@@ -6,7 +6,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -36,6 +36,9 @@ class WrongAnswer(Base):
     review_count: Mapped[int] = mapped_column(Integer, default=0, comment="复习次数")
     last_reviewed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), comment="上次复习时间"
+    )
+    is_archived: Mapped[bool] = mapped_column(
+        Boolean, default=False, comment="是否已归档（掌握度>=0.8时自动归档）"
     )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), comment="创建时间"

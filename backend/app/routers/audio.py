@@ -11,13 +11,14 @@ from __future__ import annotations
 import logging
 
 import httpx
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 
 from app.config import get_settings
 from app.middleware.auth import get_current_user
 from app.models.user import User
-from app.schemas.audio import SpeechRequest, TranscriptionResponse
+from app.schemas.audio import SpeechRequest, TranscriptionResponse, TtsQueryParams
+from app.services.tts_factory import TTSProviderFactory
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -215,3 +216,95 @@ async def create_speech(
         except Exception as e:
             logger.error("TTS 异常: user=%s, err=%s", current_user.id, str(e))
             raise HTTPException(status_code=500, detail="语音合成服务调用失败")
+
+
+# ============================================================
+# TTS — 新接口 GET /api/v1/tts
+# 支持多 provider（edge / openai），默认 edge
+# ============================================================
+
+
+def _split_long_text(text: str, max_length: int = 1024) -> list[str]:
+    """将长文本分段，避免超出 provider 限制"""
+    if len(text) <= max_length:
+        return [text]
+
+    segments = []
+    current = ""
+    for char in text:
+        if len(current) >= max_length:
+            segments.append(current)
+            current = char
+        else:
+            current += char
+    if current:
+        segments.append(current)
+    return segments
+
+
+@router.get(
+    "/api/v1/tts",
+    summary="语音合成（多提供商）",
+    description="将文字转换为语音音频，支持 Edge TTS 和 OpenAI TTS",
+    response_class=Response,
+)
+async def text_to_speech(
+    text: str = Query(..., min_length=1, max_length=1024, description="要合成的文本"),
+    provider: str = Query(default="edge", description="TTS 提供商: edge/openai"),
+    voice: str = Query(default=None, description="发音人"),
+    speed: float = Query(default=1.0, ge=0.5, le=2.0, description="语速"),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    文本转语音（多提供商）
+
+    使用 TTS Provider 工厂模式，默认使用 Edge TTS（免费）。
+    支持 provider：edge, openai
+
+    - text: 要合成的文本，不超过 1024 字符
+    - provider: edge (默认, 免费) 或 openai
+    - voice: 发音人（不同 provider 支持不同）
+    - speed: 语速 0.5-2.0
+
+    返回 audio/mpeg 格式音频，响应头包含 X-TTS-Provider
+    """
+    logger.info(
+        "TTS GET 请求: user=%s, text_len=%d, provider=%s, voice=%s",
+        current_user.id,
+        len(text),
+        provider,
+        voice or "default",
+    )
+
+    try:
+        tts_provider = TTSProviderFactory.get_provider(provider)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    try:
+        audio_bytes = await tts_provider.synthesize(
+            text=text,
+            voice=voice,
+            speed=speed,
+        )
+    except RuntimeError as e:
+        logger.error("TTS 合成失败: user=%s, provider=%s, err=%s", current_user.id, provider, str(e))
+        raise HTTPException(status_code=502, detail=f"语音合成失败: {e}")
+    except Exception as e:
+        logger.error("TTS 异常: user=%s, provider=%s, err=%s", current_user.id, provider, str(e))
+        raise HTTPException(status_code=500, detail="语音合成服务异常")
+
+    logger.info(
+        "TTS GET 成功: user=%s, size=%d, provider=%s",
+        current_user.id,
+        len(audio_bytes),
+        provider,
+    )
+
+    return Response(
+        content=audio_bytes,
+        media_type="audio/mpeg",
+        headers={
+            "X-TTS-Provider": provider,
+        },
+    )

@@ -42,6 +42,7 @@ import com.aitutor.app.ui.splash.SplashScreen
 import com.aitutor.app.ui.screen.dashboard.DashboardScreen
 import com.aitutor.app.ui.screen.quiz.QuizScreen
 import com.aitutor.app.ui.screen.review.ReviewScreen
+import com.aitutor.app.ui.flashcard.FlashcardScreen
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -305,6 +306,20 @@ fun AppNavGraph(
             composable(Routes.WRONG_ANSWERS) {
                 WrongAnswerScreen(
                     onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v4.0 Sprint 2 P1: Report Export
+            composable(Routes.REPORT_EXPORT) {
+                ReportExportScreen(
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            // v4.0 Sprint 2 P2: Flashcard
+            composable(Routes.FLASHCARD) {
+                FlashcardScreen(
+                    onNavigateBack = { navController.popBackStack() }
                 )
             }
         }

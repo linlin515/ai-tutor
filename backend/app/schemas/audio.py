@@ -58,3 +58,29 @@ class SpeechRequest(BaseModel):
         default="mp3",
         description="音频格式 (mp3/opus/aac/flac/wav/pcm)",
     )
+
+
+# ---------- TTS: 新查询参数接口 (GET) ----------
+
+class TtsQueryParams(BaseModel):
+    """TTS 查询参数（GET /api/v1/tts）"""
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=1024,
+        description="要合成语音的文本（不超过1024字符）",
+    )
+    provider: str = Field(
+        default="edge",
+        description="TTS 提供商: edge / openai",
+    )
+    voice: str | None = Field(
+        default=None,
+        description="发音人，不同 provider 支持不同发音人",
+    )
+    speed: float = Field(
+        default=1.0,
+        ge=0.5,
+        le=2.0,
+        description="语速 (0.5 ~ 2.0)",
+    )

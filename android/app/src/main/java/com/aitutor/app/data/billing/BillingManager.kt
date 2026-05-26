@@ -62,6 +62,22 @@ data class PurchaseResult(
 )
 
 /**
+ * 自定义 ProductDetails 查询结果，替代 BillingClient 5.x 的 ProductDetailsResult（无可访问的 Builder）。
+ */
+data class QueryProductDetailsResult(
+    val billingResult: BillingResult,
+    val productDetailsList: List<ProductDetails>
+)
+
+/**
+ * 自定义 Purchases 查询结果，替代 BillingClient 5.x 的 PurchaseResult（无可访问的 Builder）。
+ */
+data class QueryPurchaseResult(
+    val billingResult: BillingResult,
+    val purchases: List<Purchase>
+)
+
+/**
  * Google Play Billing 管理类。
  *
  * 管理 BillingClient 生命周期（连接/断开/重连）、
@@ -166,8 +182,8 @@ class BillingManager(
                 .setProductList(productList)
                 .build()
 
-            val productDetailsResult = withTimeout(15_000L) {
-                client.queryProductDetailsAsync(params)
+            val productDetailsResult: QueryProductDetailsResult = withTimeout(15_000L) {
+                client.awaitQueryProductDetails(params)
             }
 
             if (productDetailsResult.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
@@ -235,7 +251,7 @@ class BillingManager(
                     .setPurchaseToken(purchaseToken)
                     .build()
 
-                val result = client.acknowledgePurchase(params)
+                val result = client.awaitAcknowledgePurchase(params)
 
                 if (result.responseCode == BillingClient.BillingResponseCode.OK) {
                     return true
@@ -268,14 +284,14 @@ class BillingManager(
                 return emptyList()
             }
 
-            val result = client.queryPurchasesAsync(
+            val result = client.awaitQueryPurchases(
                 QueryPurchasesParams.newBuilder()
                     .setProductType(BillingClient.ProductType.SUBS)
                     .build()
             )
 
             if (result.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                val purchases = result.purchasesList ?: emptyList()
+                val purchases = result.purchases ?: emptyList()
                 if (purchases.isEmpty()) {
                     _purchaseState.value = PurchaseState.IDLE
                     emptyList()
@@ -414,8 +430,7 @@ class BillingManager(
     private fun Purchase.toPurchaseResult(): PurchaseResult {
         return PurchaseResult(
             purchaseToken = purchaseToken,
-            productId = products.firstOrNull { products -> products.productId == this.productId }?.productId
-                ?: this.products.firstOrNull() ?: "",
+            productId = products.firstOrNull() ?: "",
             isAcknowledged = isAcknowledged,
             orderId = orderId,
             purchaseTime = purchaseTime
@@ -423,41 +438,67 @@ class BillingManager(
     }
 }
 
+// ========== 挂起扩展函数 ==========
+
 /**
  * BillingClient.queryProductDetailsAsync 的挂起封装。
+ * BillingClient 5.x 回调签名: (BillingResult, MutableList<ProductDetails>) -> Unit
+ * 返回自定义 QueryProductDetailsResult（替代无 Builder 的 ProductDetailsResult）。
  */
-private suspend fun BillingClient.queryProductDetailsAsync(
+private suspend fun BillingClient.awaitQueryProductDetails(
     params: QueryProductDetailsParams
-): com.android.billingclient.api.ProductDetailsResult = suspendCancellableCoroutine { continuation ->
-    queryProductDetailsAsync(params) { result ->
-        if (continuation.isActive) {
-            continuation.resume(result)
+): QueryProductDetailsResult = suspendCancellableCoroutine { continuation ->
+    queryProductDetailsAsync(
+        params,
+        { billingResult: BillingResult, productDetailsList: MutableList<ProductDetails> ->
+            if (continuation.isActive) {
+                continuation.resume(
+                    QueryProductDetailsResult(
+                        billingResult = billingResult,
+                        productDetailsList = productDetailsList
+                    )
+                )
+            }
         }
-    }
+    )
 }
 
 /**
  * BillingClient.queryPurchasesAsync 的挂起封装。
+ * BillingClient 5.x 回调签名: (BillingResult, MutableList<Purchase>) -> Unit
+ * 返回自定义 QueryPurchaseResult（替代无 Builder 的 PurchaseResult）。
  */
-private suspend fun BillingClient.queryPurchasesAsync(
+private suspend fun BillingClient.awaitQueryPurchases(
     params: QueryPurchasesParams
-): com.android.billingclient.api.PurchaseResult = suspendCancellableCoroutine { continuation ->
-    queryPurchasesAsync(params) { result ->
-        if (continuation.isActive) {
-            continuation.resume(result)
+): QueryPurchaseResult = suspendCancellableCoroutine { continuation ->
+    queryPurchasesAsync(
+        params,
+        { billingResult: BillingResult, purchases: MutableList<Purchase> ->
+            if (continuation.isActive) {
+                continuation.resume(
+                    QueryPurchaseResult(
+                        billingResult = billingResult,
+                        purchases = purchases
+                    )
+                )
+            }
         }
-    }
+    )
 }
 
 /**
  * BillingClient.acknowledgePurchase 的挂起封装。
+ * BillingClient 5.x 回调签名: (BillingResult) -> Unit
  */
-private suspend fun BillingClient.acknowledgePurchase(
+private suspend fun BillingClient.awaitAcknowledgePurchase(
     params: AcknowledgePurchaseParams
 ): BillingResult = suspendCancellableCoroutine { continuation ->
-    acknowledgePurchase(params) { result ->
-        if (continuation.isActive) {
-            continuation.resume(result)
+    acknowledgePurchase(
+        params,
+        { billingResult: BillingResult ->
+            if (continuation.isActive) {
+                continuation.resume(billingResult)
+            }
         }
-    }
+    )
 }

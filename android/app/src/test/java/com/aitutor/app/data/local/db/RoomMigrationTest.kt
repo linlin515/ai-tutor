@@ -22,7 +22,7 @@ class RoomMigrationTest {
          * Must match @Database(version = ...) in AiTutorDatabase.kt.
          * Update this when adding new migrations.
          */
-        private const val CURRENT_DB_VERSION = 3
+        private const val CURRENT_DB_VERSION = 6
     }
 
     // ── Version constants ──────────────────────────────────────────────
@@ -33,12 +33,10 @@ class RoomMigrationTest {
      */
     @Test
     fun databaseVersion_shouldBeExpected() {
-        // This is a build-time sentinel: when bumping the DB version, you MUST
-        // update CURRENT_DB_VERSION here AND add a new Migration object.
         assertEquals(
             "Database version constant mismatch — add a new Migration and " +
                 "update CURRENT_DB_VERSION",
-            3,
+            6,
             CURRENT_DB_VERSION
         )
     }
@@ -56,9 +54,26 @@ class RoomMigrationTest {
     }
 
     @Test
+    fun migration3_4_shouldHaveCorrectRange() {
+        assertMigrationRange(MIGRATION_3_4, 3, 4)
+    }
+
+    @Test
+    fun migration4_5_shouldHaveCorrectRange() {
+        assertMigrationRange(MIGRATION_4_5, 4, 5)
+    }
+
+    @Test
+    fun migration5_6_shouldHaveCorrectRange() {
+        assertMigrationRange(MIGRATION_5_6, 5, 6)
+    }
+
+    @Test
     fun allMigrations_shouldFormUnbrokenChain() {
-        val migrations = listOf(MIGRATION_1_2, MIGRATION_2_3)
-            .sortedBy { it.startVersion }
+        val migrations = listOf(
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+            MIGRATION_4_5, MIGRATION_5_6
+        ).sortedBy { it.startVersion }
         var expectedStart = 1
         for (m in migrations) {
             assertEquals(
@@ -83,8 +98,10 @@ class RoomMigrationTest {
 
     @Test
     fun noMigration_shouldBeSkippable() {
-        // Verify each migration actually covers a non-trivial range
-        val migrations = listOf(MIGRATION_1_2, MIGRATION_2_3)
+        val migrations = listOf(
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4,
+            MIGRATION_4_5, MIGRATION_5_6
+        )
         for (m in migrations) {
             assertTrue(
                 "Migration ${m.startVersion}→${m.endVersion} is trivial " +
@@ -98,7 +115,6 @@ class RoomMigrationTest {
 
     @Test
     fun schemaJsonFiles_shouldExist() {
-        // Verify that exported schema JSON files exist for all versions
         val expectedFiles = (1..CURRENT_DB_VERSION).map { "$it.json" }
         val schemaDir = "schemas/com.aitutor.app.data.local.db.AiTutorDatabase/"
         for (file in expectedFiles) {

@@ -408,79 +408,8 @@ fun SettingsScreen(
         HorizontalDivider()
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Cache clearing
-        val cacheSize by viewModel.cacheSize.collectAsState()
-        val cacheClearing by viewModel.cacheClearing.collectAsState()
-        val cacheProgress by viewModel.cacheProgress.collectAsState()
-        val cacheClearedBytes by viewModel.cacheClearedBytes.collectAsState()
-        var showClearDialog by remember { mutableStateOf(false) }
-
-        ListItem(
-            headlineContent = { Text("清除缓存") },
-            supportingContent = {
-                Text(
-                    if (cacheClearing) "正在清除…" else formatCacheSize(cacheSize.total)
-                )
-            },
-            leadingContent = {
-                Icon(Icons.Default.Delete, contentDescription = null)
-            },
-            modifier = Modifier.clickable(enabled = !cacheClearing) {
-                if (cacheSize.total > 0) {
-                    showClearDialog = true
-                } else {
-                    Toast.makeText(context, "缓存已清空", Toast.LENGTH_SHORT).show()
-                }
-            }
-        )
-
-        // Clear progress indicator
-        if (cacheClearing) {
-            LinearProgressIndicator(
-                progress = { cacheProgress },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-            )
-        }
-
-        // Clear confirmation dialog
-        if (showClearDialog) {
-            AlertDialog(
-                onDismissRequest = { showClearDialog = false },
-                title = { Text("清除缓存") },
-                text = {
-                    Text("确定要清除 ${formatCacheSize(cacheSize.total)} 的缓存数据吗？")
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showClearDialog = false
-                        viewModel.clearCache()
-                    }) {
-                        Text("确定")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showClearDialog = false }) {
-                        Text("取消")
-                    }
-                }
-            )
-        }
-
-        // Toast when clear completes
-        LaunchedEffect(cacheClearedBytes) {
-            if (!cacheClearing && cacheClearedBytes > 0) {
-                val mb = cacheClearedBytes / (1024.0 * 1024.0)
-                Toast.makeText(
-                    context,
-                    "已清除 ${
-                        "%.1f".format(mb)
-                    } MB 缓存",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
+        // Cache management section (v4.0)
+        CacheManagementSection(viewModel = viewModel)
 
         // ============================================================
         // P0-3 应用内更新检测
@@ -519,14 +448,6 @@ fun SettingsScreen(
         }
 
         Spacer(modifier = Modifier.height(32.dp))
-    }
-}
-
-private fun formatCacheSize(bytes: Long): String {
-    return when {
-        bytes < 1024 -> "$bytes B"
-        bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
-        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
     }
 }
 

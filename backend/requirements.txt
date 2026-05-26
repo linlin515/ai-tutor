@@ -17,6 +17,13 @@ pydantic-settings==2.7.0
 # HTTP 客户端（调用 new-api）
 httpx==0.28.1
 
+# TTS — Edge TTS (通过 WebSocket 调用微软 Edge TTS 服务)
+websockets==13.1
+
+# 报表 — PDF 生成 (ReportLab) + 图表 (Matplotlib)
+reportlab==4.2.5
+matplotlib==3.9.3
+
 # 认证
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4

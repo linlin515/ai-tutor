@@ -2,30 +2,8 @@ package com.aitutor.app.data.local.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.aitutor.app.data.local.dao.AchievementDao
-import com.aitutor.app.data.local.dao.AnalyticsDao
-import com.aitutor.app.data.local.dao.ConversationDao
-import com.aitutor.app.data.local.dao.MessageDao
-import com.aitutor.app.data.local.dao.PendingMessageDao
-import com.aitutor.app.data.local.dao.PendingSubmissionDao
-import com.aitutor.app.data.local.dao.QuizRecordDao
-import com.aitutor.app.data.local.dao.ScoreLogDao
-import com.aitutor.app.data.local.dao.StudyReportDao
-import com.aitutor.app.data.local.dao.SubscriptionCacheDao
-import com.aitutor.app.data.local.dao.UserScoreDao
-import com.aitutor.app.data.local.dao.WrongAnswerDao
-import com.aitutor.app.data.local.entity.AchievementEntity
-import com.aitutor.app.data.local.entity.ConversationEntity
-import com.aitutor.app.data.local.entity.KnowledgePointEntity
-import com.aitutor.app.data.local.entity.LearningRecordEntity
-import com.aitutor.app.data.local.entity.MessageEntity
-import com.aitutor.app.data.local.entity.PendingMessageEntity
-import com.aitutor.app.data.local.entity.PendingSubmissionEntity
-import com.aitutor.app.data.local.entity.QuizRecordEntity
-import com.aitutor.app.data.local.entity.ScoreLogEntity
-import com.aitutor.app.data.local.entity.SubscriptionCacheEntity
-import com.aitutor.app.data.local.entity.UserScoreEntity
-import com.aitutor.app.data.local.entity.WrongAnswerEntity
+import com.aitutor.app.data.local.dao.*
+import com.aitutor.app.data.local.entity.*
 
 @Database(
     entities = [
@@ -40,9 +18,16 @@ import com.aitutor.app.data.local.entity.WrongAnswerEntity
         UserScoreEntity::class,
         ScoreLogEntity::class,
         SubscriptionCacheEntity::class,
-        PendingMessageEntity::class
+        PendingMessageEntity::class,
+        CachedQuestionEntity::class,
+        CachedWrongAnswerEntity::class,
+        CachedConversationEntity::class,
+        OfflineActionEntity::class,
+        FlashcardEntity::class,
+        FlashcardReviewLogEntity::class,
+        SyncMetadataEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 abstract class AiTutorDatabase : RoomDatabase() {
@@ -58,4 +43,10 @@ abstract class AiTutorDatabase : RoomDatabase() {
     abstract fun scoreLogDao(): ScoreLogDao
     abstract fun studyReportDao(): StudyReportDao
     abstract fun pendingMessageDao(): PendingMessageDao
+    abstract fun cachedQuestionDao(): CachedQuestionDao
+    abstract fun cachedWrongAnswerDao(): CachedWrongAnswerDao
+    abstract fun cachedConversationDao(): CachedConversationDao
+    abstract fun offlineActionDao(): OfflineActionDao
+    abstract fun flashcardDao(): FlashcardDao
+    abstract fun syncMetadataDao(): SyncMetadataDao
 }

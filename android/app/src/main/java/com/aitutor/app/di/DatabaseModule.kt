@@ -2,23 +2,13 @@ package com.aitutor.app.di
 
 import android.content.Context
 import androidx.room.Room
-import com.aitutor.app.data.local.dao.AchievementDao
-import com.aitutor.app.data.local.dao.AnalyticsDao
-import com.aitutor.app.data.local.dao.ConversationDao
-import com.aitutor.app.data.local.dao.MessageDao
-import com.aitutor.app.data.local.dao.PendingMessageDao
-import com.aitutor.app.data.local.dao.PendingSubmissionDao
-import com.aitutor.app.data.local.dao.QuizRecordDao
-import com.aitutor.app.data.local.dao.ScoreLogDao
-import com.aitutor.app.data.local.dao.StudyReportDao
-import com.aitutor.app.data.local.dao.SubscriptionCacheDao
-import com.aitutor.app.data.local.dao.UserScoreDao
-import com.aitutor.app.data.local.dao.WrongAnswerDao
+import com.aitutor.app.data.local.dao.*
 import com.aitutor.app.data.local.db.AiTutorDatabase
 import com.aitutor.app.data.local.db.MIGRATION_1_2
 import com.aitutor.app.data.local.db.MIGRATION_2_3
 import com.aitutor.app.data.local.db.MIGRATION_3_4
 import com.aitutor.app.data.local.db.MIGRATION_4_5
+import com.aitutor.app.data.local.db.MIGRATION_5_6
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -38,7 +28,7 @@ object DatabaseModule {
             AiTutorDatabase::class.java,
             "aitutor_database"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
             .build()
     }
 
@@ -104,5 +94,49 @@ object DatabaseModule {
     @Singleton
     fun provideStudyReportDao(database: AiTutorDatabase): StudyReportDao {
         return database.studyReportDao()
+    }
+
+    @Provides
+    @Singleton
+    fun providePendingMessageDao(database: AiTutorDatabase): PendingMessageDao {
+        return database.pendingMessageDao()
+    }
+
+    // === v4.0 Sprint 2: New DAOs ===
+
+    @Provides
+    @Singleton
+    fun provideCachedQuestionDao(database: AiTutorDatabase): CachedQuestionDao {
+        return database.cachedQuestionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCachedWrongAnswerDao(database: AiTutorDatabase): CachedWrongAnswerDao {
+        return database.cachedWrongAnswerDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideCachedConversationDao(database: AiTutorDatabase): CachedConversationDao {
+        return database.cachedConversationDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideOfflineActionDao(database: AiTutorDatabase): OfflineActionDao {
+        return database.offlineActionDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideFlashcardDao(database: AiTutorDatabase): FlashcardDao {
+        return database.flashcardDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncMetadataDao(database: AiTutorDatabase): SyncMetadataDao {
+        return database.syncMetadataDao()
     }
 }
