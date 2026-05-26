@@ -7,6 +7,7 @@ from app.models.user import User, UserAuth
 from app.models.subscription import Subscription
 from app.models.question_record import QuestionRecord
 from app.models.daily_quota import DailyQuota
+from app.models.user_score import UserScore
 
 __all__ = [
     "User",
@@ -14,4 +15,5 @@ __all__ = [
     "Subscription",
     "QuestionRecord",
     "DailyQuota",
+    "UserScore",
 ]

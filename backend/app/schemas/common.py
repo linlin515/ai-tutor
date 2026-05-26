@@ -6,9 +6,10 @@ from __future__ import annotations
 
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
+ItemT = TypeVar("ItemT")
 
 
 class ApiResponse(BaseModel, Generic[T]):
@@ -16,6 +17,15 @@ class ApiResponse(BaseModel, Generic[T]):
     code: int = 0
     message: str = "success"
     data: T | None = None
+
+
+class PaginatedData(BaseModel, Generic[ItemT]):
+    """通用分页数据结构"""
+    items: list[ItemT] = Field(default_factory=list, description="当前页数据列表")
+    total: int = Field(default=0, description="总记录数")
+    page: int = Field(default=1, description="当前页码")
+    page_size: int = Field(default=20, description="每页记录数")
+    total_pages: int = Field(default=0, description="总页数")
 
 
 def success(data: Any = None, message: str = "success") -> ApiResponse:
