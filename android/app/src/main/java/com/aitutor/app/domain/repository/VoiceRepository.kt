@@ -3,6 +3,14 @@ package com.aitutor.app.domain.repository
 import com.aitutor.app.data.media.AsrResult
 import java.io.File
 
+/**
+ * TTS 模式：本地引擎 / 云端引擎。
+ */
+enum class TtsMode {
+    LOCAL,
+    CLOUD
+}
+
 interface VoiceRepository {
     // === 本地语音功能 ===
     fun isListeningSupported(): Boolean

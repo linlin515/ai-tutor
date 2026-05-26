@@ -13,6 +13,7 @@ interface SettingsRepository {
     suspend fun updateThemeMode(themeMode: ThemeMode)
     suspend fun updateTtsSpeed(speed: Float)
     suspend fun updateTtsVoice(voice: String)
+    suspend fun updateTtsMode(mode: TtsMode)
     suspend fun updateDailyReminder(enabled: Boolean, hour: Int, minute: Int)
     suspend fun getSyncSettings(): AppSettings
 }

@@ -16,6 +16,7 @@ import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
 import com.aitutor.app.domain.repository.AgentRepository
 import com.aitutor.app.domain.repository.SettingsRepository
+import com.aitutor.app.domain.repository.TtsMode
 import com.aitutor.app.domain.usecase.AppUpdateChecker
 import com.aitutor.app.domain.usecase.CheckResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -137,6 +138,12 @@ class SettingsViewModel @Inject constructor(
     fun updateTtsSpeed(speed: Float) {
         viewModelScope.launch {
             settingsRepository.updateTtsSpeed(speed)
+        }
+    }
+
+    fun updateTtsMode(mode: TtsMode) {
+        viewModelScope.launch {
+            settingsRepository.updateTtsMode(mode)
         }
     }
 

@@ -36,6 +36,7 @@ import com.aitutor.app.data.local.CacheSize
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.AppUpdateInfo
 import com.aitutor.app.domain.model.ThemeMode
+import com.aitutor.app.domain.repository.TtsMode
 import com.aitutor.app.domain.usecase.CheckResult
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -247,6 +248,34 @@ fun SettingsScreen(
             steps = 14,
             currentValue = settings.ttsSpeed
         )
+
+        // TTS 引擎切换
+        Text(
+            text = "TTS 引擎",
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            TtsMode.values().forEach { mode ->
+                FilterChip(
+                    selected = settings.ttsMode == mode,
+                    onClick = { viewModel.updateTtsMode(mode) },
+                    label = {
+                        Text(
+                            when (mode) {
+                                TtsMode.LOCAL -> "本地"
+                                TtsMode.CLOUD -> "云端"
+                            }
+                        )
+                    }
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(8.dp))
         HorizontalDivider()

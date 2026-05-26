@@ -4,6 +4,7 @@ import com.aitutor.app.data.remote.datastore.SettingsDataStore
 import com.aitutor.app.domain.model.AppSettings
 import com.aitutor.app.domain.model.ThemeMode
 import com.aitutor.app.domain.repository.SettingsRepository
+import com.aitutor.app.domain.repository.TtsMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
@@ -44,6 +45,10 @@ class SettingsRepositoryImpl @Inject constructor(
 
     override suspend fun updateTtsVoice(voice: String) {
         settingsDataStore.updateTtsVoice(voice)
+    }
+
+    override suspend fun updateTtsMode(mode: TtsMode) {
+        settingsDataStore.updateTtsMode(mode)
     }
 
     override suspend fun updateDailyReminder(enabled: Boolean, hour: Int, minute: Int) {

@@ -19,7 +19,7 @@ import javax.inject.Singleton
 /**
  * 云端 ASR 调用封装 (F16)
  *
- * 将录音文件上传至 POST /api/v1/voice/asr (multipart audio),
+ * 将录音文件上传至 POST /v1/audio/transcriptions (multipart audio),
  * 返回识别文本。支持超时取消。
  */
 data class AsrConfig(

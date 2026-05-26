@@ -71,7 +71,7 @@ interface AiTutorApi {
 
     // Cloud ASR
     @Multipart
-    @POST("api/v1/voice/asr")
+    @POST("v1/audio/transcriptions")
     suspend fun cloudAsr(
         @Part audio: MultipartBody.Part
     ): Response<ApiResponse<CloudAsrResponse>>
