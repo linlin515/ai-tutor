@@ -4,24 +4,28 @@ import com.aitutor.app.data.repository.AgentRepositoryImpl
 import com.aitutor.app.data.repository.AnalyticsRepositoryImpl
 import com.aitutor.app.data.repository.AuthRepositoryImpl
 import com.aitutor.app.data.repository.ChatRepositoryImpl
+import com.aitutor.app.data.repository.FlashcardRepositoryImpl
 import com.aitutor.app.data.repository.GamificationRepositoryImpl
 import com.aitutor.app.data.repository.QuizRepositoryImpl
 import com.aitutor.app.data.repository.SettingsRepositoryImpl
 import com.aitutor.app.data.repository.SolveRepositoryImpl
 import com.aitutor.app.data.repository.StudyReportRepositoryImpl
 import com.aitutor.app.data.repository.SubscriptionRepositoryImpl
+import com.aitutor.app.data.repository.SyncRepositoryImpl
 import com.aitutor.app.data.repository.VoiceRepositoryImpl
 import com.aitutor.app.data.repository.WrongAnswerRepositoryImpl
 import com.aitutor.app.domain.repository.AgentRepository
 import com.aitutor.app.domain.repository.AnalyticsRepository
 import com.aitutor.app.domain.repository.AuthRepository
 import com.aitutor.app.domain.repository.ChatRepository
+import com.aitutor.app.domain.repository.FlashcardRepository
 import com.aitutor.app.domain.repository.GamificationRepository
 import com.aitutor.app.domain.repository.QuizRepository
 import com.aitutor.app.domain.repository.SettingsRepository
 import com.aitutor.app.domain.repository.SolveRepository
 import com.aitutor.app.domain.repository.StudyReportRepository
 import com.aitutor.app.domain.repository.SubscriptionRepository
+import com.aitutor.app.domain.repository.SyncRepository
 import com.aitutor.app.domain.repository.VoiceRepository
 import com.aitutor.app.domain.repository.WrongAnswerRepository
 import dagger.Binds
@@ -81,4 +85,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindStudyReportRepository(impl: StudyReportRepositoryImpl): StudyReportRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindSyncRepository(impl: SyncRepositoryImpl): SyncRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindFlashcardRepository(impl: FlashcardRepositoryImpl): FlashcardRepository
 }

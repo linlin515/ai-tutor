@@ -3,10 +3,12 @@ package com.aitutor.app.di
 import com.aitutor.app.data.remote.api.AiTutorApi
 import com.aitutor.app.data.remote.api.AnalyticsApi
 import com.aitutor.app.data.remote.api.ChatStreamApi
+import com.aitutor.app.data.remote.api.FlashcardApi
 import com.aitutor.app.data.remote.api.GamificationApi
 import com.aitutor.app.data.remote.api.QuizApi
 import com.aitutor.app.data.remote.api.SolveApi
 import com.aitutor.app.data.remote.api.SubscriptionApi
+import com.aitutor.app.data.remote.api.SyncApi
 import com.aitutor.app.data.remote.interceptor.AuthInterceptor
 import com.aitutor.app.data.remote.interceptor.NetworkErrorInterceptor
 import com.aitutor.app.data.remote.interceptor.TokenManager
@@ -121,6 +123,18 @@ object NetworkModule {
     @Singleton
     fun provideSubscriptionApi(retrofit: Retrofit): SubscriptionApi {
         return retrofit.create(SubscriptionApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideSyncApi(retrofit: Retrofit): SyncApi {
+        return retrofit.create(SyncApi::class.java)
+    }
+
+    @Provides
+    @Singleton
+    fun provideFlashcardApi(retrofit: Retrofit): FlashcardApi {
+        return retrofit.create(FlashcardApi::class.java)
     }
 
     /**
