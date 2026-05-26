@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Release 构建 — 仅允许 HTTPS 通信
-    Debug 构建会在 app/src/debug/ 中覆盖此文件
+    Release 构建 — 仅允许 HTTPS，但后端 API 服务器使用 HTTP
 -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false">
@@ -9,4 +8,8 @@
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+    <!-- Backend API server (HTTP, no HTTPS) -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">35.212.211.250</domain>
+    </domain-config>
 </network-security-config>
