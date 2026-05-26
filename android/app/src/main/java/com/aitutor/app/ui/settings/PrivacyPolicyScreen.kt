@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -181,4 +184,26 @@ internal fun BulletText(text: String) {
         style = MaterialTheme.typography.bodyMedium,
         modifier = Modifier.padding(start = 8.dp, bottom = 4.dp)
     )
+}
+
+// ===== Preview =====
+@Preview(
+    name = "隐私政策 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "隐私政策 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun PrivacyPolicyScreenPreview() {
+    AiTutorTheme {
+        PrivacyPolicyScreen(onBack = {})
+    }
 }

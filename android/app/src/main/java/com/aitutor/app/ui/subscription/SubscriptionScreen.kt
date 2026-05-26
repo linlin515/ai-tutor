@@ -17,6 +17,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.res.Configuration
+import androidx.compose.ui.tooling.preview.Preview
+import com.aitutor.app.ui.theme.AiTutorTheme
 
 /**
  * 订阅页面
@@ -332,4 +335,26 @@ fun FeatureComparisonRow(
     }
 
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+}
+
+// ===== Preview =====
+@Preview(
+    name = "订阅页 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "订阅页 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun UiSubscriptionScreenPreview() {
+    AiTutorTheme {
+        com.aitutor.app.ui.subscription.SubscriptionScreen(onBack = {})
+    }
 }
