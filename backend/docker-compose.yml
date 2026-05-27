@@ -15,12 +15,15 @@ services:
     volumes:
       # 将 .env 文件挂载到容器中（只读）
       - ./.env.docker:/app/.env:ro
+    extra_hosts:
+      # Linux Docker 需要显式映射 host.docker.internal 到宿主机
+      - "host.docker.internal:host-gateway"
     environment:
       # 数据库连接（PostgreSQL）
       - DATABASE_URL=postgresql+asyncpg://aiuser:ai_password@postgres:5432/ai_tutor
       # Redis 连接
       - REDIS_URL=redis://redis:6379/0
-      # new-api 代理地址（连接到宿主机）
+      # new-api 代理地址（连接到宿主机上的 New-API 服务）
       - NEW_API_BASE_URL=http://host.docker.internal:3000/v1
     depends_on:
       postgres:
