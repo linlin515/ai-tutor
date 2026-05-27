@@ -50,27 +50,53 @@ fun SubscriptionScreen(
         }
     }
 
-    // 配额超限对话框
-    if (uiState.showQuotaExceededDialog && uiState.exceededFeature != null) {
-        QuotaExceededDialog(
-            featureName = uiState.exceededFeature!!.displayName,
-            usedQueries = uiState.subscription.dailyQuota.usedQueries,
-            totalQueries = uiState.subscription.dailyQuota.totalQueries,
-            onDismiss = { viewModel.dismissQuotaExceededDialog() },
-            onViewPlans = {
-                viewModel.dismissQuotaExceededDialog()
-                // 页面已经在订阅页，所以什么都不做
-            }
-        )
-    }
-
-    // Snackbar 消息
+    // Snackbar
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(uiState.message) {
         uiState.message?.let {
             snackbarHostState.showSnackbar(it)
             viewModel.dismissMessage()
         }
+    }
+
+    SubscriptionScreenContent(
+        state = uiState,
+        onPurchase = viewModel::purchase,
+        onRestorePurchases = viewModel::restorePurchases,
+        onRefreshStatus = viewModel::refreshStatus,
+        onConnectAndQuery = viewModel::connectAndQuery,
+        onDismissQuotaExceededDialog = viewModel::dismissQuotaExceededDialog,
+        onBack = onBack,
+        snackbarHostState = snackbarHostState
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SubscriptionScreenContent(
+    state: SubscriptionUiState,
+    onPurchase: (String) -> Unit,
+    onRestorePurchases: () -> Unit,
+    onRefreshStatus: () -> Unit,
+    onConnectAndQuery: () -> Unit,
+    onDismissQuotaExceededDialog: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
+) {
+    // 配额超限对话框
+    if (state.showQuotaExceededDialog) {
+        val exceededFeature = state.exceededFeature ?: return
+        QuotaExceededDialog(
+            featureName = exceededFeature.displayName,
+            usedQueries = state.subscription.dailyQuota.usedQueries,
+            totalQueries = state.subscription.dailyQuota.totalQueries,
+            onDismiss = onDismissQuotaExceededDialog,
+            onViewPlans = {
+                onDismissQuotaExceededDialog()
+                // 页面已经在订阅页，所以什么都不做
+            }
+        )
     }
 
     Scaffold(
@@ -85,10 +111,10 @@ fun SubscriptionScreen(
                 actions = {
                     // 恢复购买按钮
                     TextButton(
-                        onClick = { viewModel.restorePurchases() },
-                        enabled = !uiState.isRestoring
+                        onClick = onRestorePurchases,
+                        enabled = !state.isRestoring
                     ) {
-                        if (uiState.isRestoring) {
+                        if (state.isRestoring) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                         } else {
                             Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -96,7 +122,7 @@ fun SubscriptionScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("恢复购买")
                     }
-                    TextButton(onClick = { viewModel.refreshStatus() }) {
+                    TextButton(onClick = onRefreshStatus) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
                         Text("刷新")
@@ -107,7 +133,7 @@ fun SubscriptionScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { padding ->
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
@@ -137,7 +163,7 @@ fun SubscriptionScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             // 连接状态提示
-            if (uiState.connectionState == BillingConnectionState.DISCONNECTED) {
+            if (state.connectionState == BillingConnectionState.DISCONNECTED) {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(
@@ -154,7 +180,7 @@ fun SubscriptionScreen(
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             modifier = Modifier.weight(1f)
                         )
-                        TextButton(onClick = { viewModel.connectAndQuery() }) {
+                        TextButton(onClick = onConnectAndQuery) {
                             Text("重试")
                         }
                     }
@@ -163,7 +189,7 @@ fun SubscriptionScreen(
             }
 
             // 日配额进度条
-            val daily = uiState.subscription.dailyQuota
+            val daily = state.subscription.dailyQuota
             if (daily.totalQueries > 0) {
                 QuotaProgressBar(
                     used = daily.usedQueries,
@@ -173,7 +199,7 @@ fun SubscriptionScreen(
             }
 
             // 加载中
-            if (uiState.subscription.isLoading) {
+            if (state.subscription.isLoading) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -185,7 +211,7 @@ fun SubscriptionScreen(
             }
 
             // 从 BillingManager 获取商品信息
-            val billingProducts = uiState.products
+            val billingProducts = state.products
             val monthlyProduct = billingProducts.find { it.type == BillingProductType.MONTHLY }
             val yearlyProduct = billingProducts.find { it.type == BillingProductType.YEARLY }
 
@@ -201,7 +227,7 @@ fun SubscriptionScreen(
                     "语文 / 数学 / 英语"
                 ),
                 isRecommended = false,
-                isCurrentPlan = uiState.subscription.planType == "free",
+                isCurrentPlan = state.subscription.planType == "free",
                 accentColor = MaterialTheme.colorScheme.outline,
                 onSubscribe = { /* 免费版无需订阅 */ }
             )
@@ -222,12 +248,12 @@ fun SubscriptionScreen(
                     "学习报告分析"
                 ),
                 isRecommended = true,
-                isCurrentPlan = uiState.subscription.planType == "premium",
+                isCurrentPlan = state.subscription.planType == "premium",
                 accentColor = MaterialTheme.colorScheme.secondary,
                 onSubscribe = {
-                    viewModel.purchase("premium_monthly")
+                    onPurchase("premium_monthly")
                 },
-                isLoading = uiState.isPurchasing && uiState.purchaseState == PurchaseState.PURCHASING
+                isLoading = state.isPurchasing && state.purchaseState == PurchaseState.PURCHASING
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -247,12 +273,12 @@ fun SubscriptionScreen(
                     "约 55 折优惠"
                 ),
                 isRecommended = false,
-                isCurrentPlan = uiState.subscription.planType == "premium",
+                isCurrentPlan = state.subscription.planType == "premium",
                 accentColor = MaterialTheme.colorScheme.tertiary,
                 onSubscribe = {
-                    viewModel.purchase("premium_yearly")
+                    onPurchase("premium_yearly")
                 },
-                isLoading = uiState.isPurchasing && uiState.purchaseState == PurchaseState.PURCHASING
+                isLoading = state.isPurchasing && state.purchaseState == PurchaseState.PURCHASING
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -320,6 +346,16 @@ fun SubscriptionScreen(
 @Composable
 private fun PreviewSubscriptionScreen() {
     AiTutorTheme {
-        SubscriptionScreen(onBack = {})
+        SubscriptionScreenContent(
+            state = SubscriptionUiState(
+                subscription = SubscriptionState(isLoading = true)
+            ),
+            onPurchase = {},
+            onRestorePurchases = {},
+            onRefreshStatus = {},
+            onConnectAndQuery = {},
+            onDismissQuotaExceededDialog = {},
+            onBack = {}
+        )
     }
 }

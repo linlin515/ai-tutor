@@ -14,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.domain.model.QuizConfig
 import com.aitutor.app.domain.model.QuizPhase
+import com.aitutor.app.domain.model.QuizUiState
 import com.aitutor.app.domain.model.Question
 import com.aitutor.app.ui.screen.quiz.components.*
 import android.content.res.Configuration
@@ -36,14 +37,32 @@ fun QuizScreen(
         }
     }
 
+    QuizScreenContent(
+        state = uiState,
+        onSubmitAnswer = { qId, answer -> viewModel.submitAnswer(qId, answer) },
+        onSubmitAll = { viewModel.submitAllAnswers() },
+        onRetry = { viewModel.retryGenerate() },
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun QuizScreenContent(
+    state: QuizUiState,
+    onSubmitAnswer: (String, String) -> Unit,
+    onSubmitAll: () -> Unit,
+    onRetry: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("交互式测验") },
                 navigationIcon = {
                     IconButton(onClick = {
-                        if (uiState.phase == QuizPhase.DONE) {
-                            viewModel.reset()
+                        if (state.phase == QuizPhase.DONE) {
                             onBack()
                         } else {
                             onBack()
@@ -56,11 +75,11 @@ fun QuizScreen(
         }
     ) { padding ->
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            when (uiState.phase) {
+            when (state.phase) {
                 QuizPhase.IDLE,
                 QuizPhase.GENERATING -> {
                     Column(
@@ -74,12 +93,12 @@ fun QuizScreen(
                 }
                 QuizPhase.ANSWERING -> {
                     QuizAnsweringContent(
-                        questions = uiState.questions,
-                        answers = uiState.answers,
-                        answeredCount = uiState.answers.size,
-                        totalCount = uiState.questions.size,
-                        onSubmitAnswer = { qId, answer -> viewModel.submitAnswer(qId, answer) },
-                        onSubmitAll = { viewModel.submitAllAnswers() }
+                        questions = state.questions,
+                        answers = state.answers,
+                        answeredCount = state.answers.size,
+                        totalCount = state.questions.size,
+                        onSubmitAnswer = onSubmitAnswer,
+                        onSubmitAll = onSubmitAll
                     )
                 }
                 QuizPhase.SUBMITTING,
@@ -94,10 +113,10 @@ fun QuizScreen(
                     }
                 }
                 QuizPhase.DONE -> {
-                    uiState.result?.let { result ->
+                    state.result?.let { result ->
                         QuizResultCard(
                             result = result,
-                            onRetry = { viewModel.retryGenerate() },
+                            onRetry = onRetry,
                             onBack = onBack
                         )
                     }
@@ -108,39 +127,17 @@ fun QuizScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = uiState.error ?: "出错了",
+                            text = state.error ?: "出错了",
                             color = MaterialTheme.colorScheme.error
                         )
                         Spacer(modifier = Modifier.height(16.dp))
-                        Button(onClick = { viewModel.retryGenerate() }) {
+                        Button(onClick = onRetry) {
                             Text("重试")
                         }
                     }
                 }
             }
         }
-    }
-}
-
-// ===== Preview =====
-@Preview(
-    name = "测验页 预览",
-    showBackground = true,
-    backgroundColor = 0xFF1C1B1F,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_NO
-)
-@Preview(
-    name = "测验页 预览 (深色)",
-    showBackground = true,
-    backgroundColor = 0xFFFEFBFF,
-    showSystemUi = false,
-    uiMode = Configuration.UI_MODE_NIGHT_YES
-)
-@Composable
-private fun QuizScreenPreview() {
-    AiTutorTheme {
-        QuizScreen(onBack = {})
     }
 }
 
@@ -202,5 +199,41 @@ private fun QuizAnsweringContent(
                 )
             }
         }
+    }
+}
+
+// ===== Preview =====
+@Preview(
+    name = "测验页 预览",
+    showBackground = true,
+    backgroundColor = 0xFF1C1B1F,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_NO
+)
+@Preview(
+    name = "测验页 预览 (深色)",
+    showBackground = true,
+    backgroundColor = 0xFFFEFBFF,
+    showSystemUi = false,
+    uiMode = Configuration.UI_MODE_NIGHT_YES
+)
+@Composable
+private fun QuizScreenPreview() {
+    AiTutorTheme {
+        QuizScreenContent(
+            state = QuizUiState(
+                phase = QuizPhase.IDLE,
+                config = QuizConfig(subject = "math"),
+                questions = emptyList(),
+                answers = emptyMap(),
+                result = null,
+                error = null,
+                retryPending = false
+            ),
+            onSubmitAnswer = { _, _ -> },
+            onSubmitAll = {},
+            onRetry = {},
+            onBack = {}
+        )
     }
 }

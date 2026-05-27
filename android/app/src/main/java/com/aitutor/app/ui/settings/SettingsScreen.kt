@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -58,10 +59,121 @@ fun SettingsScreen(
 ) {
     val settings by viewModel.settings.collectAsState()
     val currentLanguage by viewModel.currentLanguage.collectAsState()
+    val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
+    val updateCheckResult by viewModel.updateCheckResult.collectAsState()
+    val agentEnabled by viewModel.agentEnabled.collectAsState()
+    val cacheSize by viewModel.cacheSize.collectAsState()
+    val cacheClearing by viewModel.cacheClearing.collectAsState()
+    val cacheProgress by viewModel.cacheProgress.collectAsState()
+    val cacheClearedBytes by viewModel.cacheClearedBytes.collectAsState()
     val context = LocalContext.current
 
+    var showUpdateDialog by remember { mutableStateOf<AppUpdateInfo?>(null) }
+
+    // Handle update check results
+    LaunchedEffect(updateCheckResult) {
+        when (val result = updateCheckResult) {
+            is CheckResult.NoUpdate -> {
+                Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
+                viewModel.clearUpdateResult()
+            }
+            is CheckResult.UpdateAvailable -> {
+                showUpdateDialog = result.info
+            }
+            is CheckResult.Error -> {
+                Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                viewModel.clearUpdateResult()
+            }
+            null -> { /* no result yet */ }
+        }
+    }
+
+    SettingsScreenContent(
+        settings = settings,
+        currentLanguage = currentLanguage,
+        availableLanguages = viewModel.availableLanguages,
+        isCheckingUpdate = isCheckingUpdate,
+        agentEnabled = agentEnabled,
+        cacheSize = cacheSize,
+        cacheClearing = cacheClearing,
+        cacheProgress = cacheProgress,
+        cacheClearedBytes = cacheClearedBytes,
+        showUpdateDialog = showUpdateDialog,
+        onTemperatureChange = viewModel::updateTemperature,
+        onTopPChange = viewModel::updateTopP,
+        onMaxTokensChange = viewModel::updateMaxTokens,
+        onThemeModeChange = viewModel::updateThemeMode,
+        onTtsSpeedChange = viewModel::updateTtsSpeed,
+        onTtsModeChange = viewModel::updateTtsMode,
+        onLanguageChange = viewModel::setLanguage,
+        onAgentToggle = viewModel::toggleAgentMode,
+        onDailyReminderToggle = viewModel::toggleDailyReminder,
+        onCheckUpdate = viewModel::checkForUpdate,
+        onClearCache = viewModel::clearCache,
+        onDismissUpdateDialog = {
+            showUpdateDialog = null
+            viewModel.clearUpdateResult()
+        },
+        onNavigateToProfile = onNavigateToProfile,
+        onNavigateToSubscription = onNavigateToSubscription,
+        onNavigateToReport = onNavigateToReport,
+        onNavigateToPrivacyPolicy = onNavigateToPrivacyPolicy,
+        onNavigateToUserAgreement = onNavigateToUserAgreement,
+        onNavigateToCrashLog = onNavigateToCrashLog,
+        onNavigateToFavorites = onNavigateToFavorites
+    )
+}
+
+@Composable
+fun SettingsScreenContent(
+    settings: AppSettings,
+    currentLanguage: Locale,
+    availableLanguages: List<Locale>,
+    isCheckingUpdate: Boolean,
+    agentEnabled: Boolean,
+    cacheSize: CacheSize,
+    cacheClearing: Boolean,
+    cacheProgress: Float,
+    cacheClearedBytes: Long,
+    showUpdateDialog: AppUpdateInfo?,
+    onTemperatureChange: (Float) -> Unit,
+    onTopPChange: (Float) -> Unit,
+    onMaxTokensChange: (Int) -> Unit,
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onTtsSpeedChange: (Float) -> Unit,
+    onTtsModeChange: (TtsMode) -> Unit,
+    onLanguageChange: (Locale) -> Unit,
+    onAgentToggle: () -> Unit,
+    onDailyReminderToggle: (Boolean) -> Unit,
+    onCheckUpdate: () -> Unit,
+    onClearCache: () -> Unit,
+    onDismissUpdateDialog: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onNavigateToSubscription: () -> Unit,
+    onNavigateToReport: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
+    onNavigateToUserAgreement: () -> Unit,
+    onNavigateToCrashLog: () -> Unit,
+    onNavigateToFavorites: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+    var showClearDialog by remember { mutableStateOf(false) }
+
+    // Toast when cache clear completes
+    LaunchedEffect(cacheClearedBytes) {
+        if (!cacheClearing && cacheClearedBytes > 0) {
+            val mb = cacheClearedBytes / (1024.0 * 1024.0)
+            Toast.makeText(
+                context,
+                "已清除 ${"%.1f".format(mb)} MB 缓存",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
@@ -113,7 +225,7 @@ fun SettingsScreen(
         SettingsSlider(
             label = "Temperature",
             value = String.format("%.1f", settings.temperature),
-            onValueChange = { viewModel.updateTemperature(it) },
+            onValueChange = onTemperatureChange,
             valueRange = 0f..2f,
             steps = 19,
             currentValue = settings.temperature
@@ -122,7 +234,7 @@ fun SettingsScreen(
         SettingsSlider(
             label = "Top-P",
             value = String.format("%.2f", settings.topP),
-            onValueChange = { viewModel.updateTopP(it) },
+            onValueChange = onTopPChange,
             valueRange = 0f..1f,
             steps = 19,
             currentValue = settings.topP
@@ -131,7 +243,7 @@ fun SettingsScreen(
         SettingsSlider(
             label = "最大 Token 数",
             value = "${settings.maxTokens}",
-            onValueChange = { viewModel.updateMaxTokens(it.roundToInt()) },
+            onValueChange = { onMaxTokensChange(it.roundToInt()) },
             valueRange = 256f..4096f,
             steps = 14,
             currentValue = settings.maxTokens.toFloat()
@@ -155,12 +267,12 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            viewModel.availableLanguages.forEach { locale ->
+            availableLanguages.forEach { locale ->
                 FilterChip(
                     selected = currentLanguage.language == locale.language,
-                    onClick = { viewModel.setLanguage(locale) },
+                    onClick = { onLanguageChange(locale) },
                     label = {
-                        Text(viewModel.getLanguageDisplayName(locale))
+                        Text(getLanguageDisplayName(locale))
                     }
                 )
             }
@@ -191,7 +303,7 @@ fun SettingsScreen(
             ThemeMode.values().forEach { mode ->
                 FilterChip(
                     selected = settings.darkTheme == mode,
-                    onClick = { viewModel.updateThemeMode(mode) },
+                    onClick = { onThemeModeChange(mode) },
                     label = {
                         Text(
                             when (mode) {
@@ -219,15 +331,15 @@ fun SettingsScreen(
         ListItem(
             headlineContent = { Text("Agent 模式") },
             supportingContent = {
-                Text(if (viewModel.agentEnabled.collectAsState().value) "已开启 - AI可联网搜索" else "已关闭")
+                Text(if (agentEnabled) "已开启 - AI可联网搜索" else "已关闭")
             },
             leadingContent = {
                 Icon(Icons.Default.Psychology, contentDescription = null)
             },
             trailingContent = {
                 Switch(
-                    checked = viewModel.agentEnabled.collectAsState().value,
-                    onCheckedChange = { viewModel.toggleAgentMode() }
+                    checked = agentEnabled,
+                    onCheckedChange = { onAgentToggle() }
                 )
             }
         )
@@ -246,7 +358,7 @@ fun SettingsScreen(
         SettingsSlider(
             label = "TTS 语速",
             value = String.format("%.1f", settings.ttsSpeed),
-            onValueChange = { viewModel.updateTtsSpeed(it) },
+            onValueChange = onTtsSpeedChange,
             valueRange = 0.5f..2.0f,
             steps = 14,
             currentValue = settings.ttsSpeed
@@ -267,7 +379,7 @@ fun SettingsScreen(
             TtsMode.values().forEach { mode ->
                 FilterChip(
                     selected = settings.ttsMode == mode,
-                    onClick = { viewModel.updateTtsMode(mode) },
+                    onClick = { onTtsModeChange(mode) },
                     label = {
                         Text(
                             when (mode) {
@@ -307,7 +419,7 @@ fun SettingsScreen(
             trailingContent = {
                 Switch(
                     checked = reminderEnabled,
-                    onCheckedChange = { viewModel.toggleDailyReminder(it) }
+                    onCheckedChange = onDailyReminderToggle
                 )
             }
         )
@@ -347,7 +459,6 @@ fun SettingsScreen(
         HorizontalDivider()
 
         // Check Update button
-        val isCheckingUpdate by viewModel.isCheckingUpdate.collectAsState()
         ListItem(
             headlineContent = {
                 if (isCheckingUpdate) {
@@ -367,7 +478,7 @@ fun SettingsScreen(
                 }
             },
             modifier = Modifier.clickable(enabled = !isCheckingUpdate) {
-                viewModel.checkForUpdate()
+                onCheckUpdate()
             }
         )
 
@@ -412,41 +523,114 @@ fun SettingsScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         // Cache management section (v4.0)
-        CacheManagementSection(viewModel = viewModel)
+        // Database cache info
+        Text(
+            text = "缓存管理",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
 
-        // ============================================================
-        // P0-3 应用内更新检测
-        // ============================================================
+        ListItem(
+            headlineContent = { Text("数据库缓存") },
+            supportingContent = {
+                Text(formatCacheSize(cacheSize.database))
+            },
+            leadingContent = {
+                Icon(Icons.Default.Storage, contentDescription = null)
+            }
+        )
 
-        val updateCheckResult by viewModel.updateCheckResult.collectAsState()
-        var showUpdateDialog by remember { mutableStateOf<AppUpdateInfo?>(null) }
+        ListItem(
+            headlineContent = { Text("图片缓存") },
+            supportingContent = {
+                Text(formatCacheSize(cacheSize.imageDisk))
+            },
+            leadingContent = {
+                Icon(Icons.Default.Storage, contentDescription = null)
+            }
+        )
 
-        // Handle update check results
-        LaunchedEffect(updateCheckResult) {
-            when (val result = updateCheckResult) {
-                is CheckResult.NoUpdate -> {
-                    Toast.makeText(context, "已是最新版本", Toast.LENGTH_SHORT).show()
-                    viewModel.clearUpdateResult()
-                }
-                is CheckResult.UpdateAvailable -> {
-                    showUpdateDialog = result.info
-                }
-                is CheckResult.Error -> {
-                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                    viewModel.clearUpdateResult()
-                }
-                null -> { /* no result yet */ }
+        ListItem(
+            headlineContent = { Text("清除缓存") },
+            supportingContent = {
+                Text(
+                    if (cacheClearing) "正在清除…" else formatCacheSize(cacheSize.total)
+                )
+            },
+            leadingContent = {
+                Icon(Icons.Default.Delete, contentDescription = null)
+            },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+
+        // Clear progress indicator
+        if (cacheClearing) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                LinearProgressIndicator(
+                    progress = { cacheProgress },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(
+                    text = "${(cacheProgress * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall
+                )
             }
         }
+
+        // Clear button at bottom
+        TextButton(
+            onClick = {
+                if (cacheSize.total > 0) {
+                    showClearDialog = true
+                } else {
+                    Toast.makeText(context, "缓存已清空", Toast.LENGTH_SHORT).show()
+                }
+            },
+            enabled = !cacheClearing,
+            modifier = Modifier.padding(horizontal = 16.dp)
+        ) {
+            Text("清除所有缓存")
+        }
+
+        // Clear confirmation dialog
+        if (showClearDialog) {
+            AlertDialog(
+                onDismissRequest = { showClearDialog = false },
+                title = { Text("清除缓存") },
+                text = {
+                    Text("确定要清除 ${formatCacheSize(cacheSize.total)} 的缓存数据吗？")
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showClearDialog = false
+                        onClearCache()
+                    }) {
+                        Text("确定")
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showClearDialog = false }) {
+                        Text("取消")
+                    }
+                }
+            )
+        }
+
+        HorizontalDivider()
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Update dialog
         showUpdateDialog?.let { info ->
             UpdateDialog(
                 updateInfo = info,
-                onDismiss = {
-                    showUpdateDialog = null
-                    viewModel.clearUpdateResult()
-                }
+                onDismiss = onDismissUpdateDialog
             )
         }
 
@@ -492,8 +676,58 @@ private fun SettingsSlider(
     }
 }
 
+private fun getLanguageDisplayName(locale: Locale): String {
+    return when (locale.language) {
+        "zh" -> "中文"
+        "en" -> "English"
+        else -> locale.displayName
+    }
+}
+
+private fun formatCacheSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> "%.1f KB".format(bytes / 1024.0)
+        else -> "%.1f MB".format(bytes / (1024.0 * 1024.0))
+    }
+}
+
 // ===== Preview =====
 @Preview(name = "设置 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "设置 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewSettingsScreen() { AiTutorTheme { SettingsScreen() } }
+private fun PreviewSettingsScreen() {
+    AiTutorTheme {
+        SettingsScreenContent(
+            settings = AppSettings(),
+            currentLanguage = Locale.CHINA,
+            availableLanguages = listOf(Locale.CHINA, Locale.US),
+            isCheckingUpdate = false,
+            agentEnabled = false,
+            cacheSize = CacheSize(),
+            cacheClearing = false,
+            cacheProgress = 0f,
+            cacheClearedBytes = 0L,
+            showUpdateDialog = null,
+            onTemperatureChange = {},
+            onTopPChange = {},
+            onMaxTokensChange = {},
+            onThemeModeChange = {},
+            onTtsSpeedChange = {},
+            onTtsModeChange = {},
+            onLanguageChange = {},
+            onAgentToggle = {},
+            onDailyReminderToggle = {},
+            onCheckUpdate = {},
+            onClearCache = {},
+            onDismissUpdateDialog = {},
+            onNavigateToProfile = {},
+            onNavigateToSubscription = {},
+            onNavigateToReport = {},
+            onNavigateToPrivacyPolicy = {},
+            onNavigateToUserAgreement = {},
+            onNavigateToCrashLog = {},
+            onNavigateToFavorites = {}
+        )
+    }
+}

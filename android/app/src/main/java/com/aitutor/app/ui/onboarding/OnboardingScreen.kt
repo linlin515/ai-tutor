@@ -51,14 +51,30 @@ private val pages = listOf(
     )
 )
 
+// ===== Content composable (pure UI, stateless) =====
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun OnboardingScreen(
+fun OnboardingScreenContent(
+    currentPage: Int,
+    pageCount: Int,
+    onPageChange: (Int) -> Unit,
     onOnboardingComplete: () -> Unit,
-    viewModel: OnboardingViewModel = hiltViewModel()
+    modifier: Modifier = Modifier
 ) {
-    val pagerState = rememberPagerState(pageCount = { pages.size })
+    val pagerState = rememberPagerState(pageCount = { pageCount })
     val coroutineScope = rememberCoroutineScope()
+
+    // Sync pagerState when currentPage changes from outside
+    LaunchedEffect(currentPage) {
+        if (currentPage != pagerState.currentPage && currentPage in 0 until pageCount) {
+            pagerState.animateScrollToPage(currentPage)
+        }
+    }
+
+    // Notify parent when page changes via swipe
+    LaunchedEffect(pagerState.currentPage) {
+        onPageChange(pagerState.currentPage)
+    }
 
     Scaffold { padding ->
         Column(
@@ -73,11 +89,8 @@ fun OnboardingScreen(
                     .padding(top = 48.dp, end = 16.dp),
                 horizontalArrangement = Arrangement.End
             ) {
-                if (pagerState.currentPage < pages.size - 1) {
-                    TextButton(onClick = {
-                        viewModel.onOnboardingComplete()
-                        onOnboardingComplete()
-                    }) {
+                if (pagerState.currentPage < pageCount - 1) {
+                    TextButton(onClick = onOnboardingComplete) {
                         Text("跳过", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 } else {
@@ -167,12 +180,11 @@ fun OnboardingScreen(
                 // Next / Start button
                 Button(
                     onClick = {
-                        if (pagerState.currentPage < pages.size - 1) {
+                        if (pagerState.currentPage < pageCount - 1) {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(pagerState.currentPage + 1)
                             }
                         } else {
-                            viewModel.onOnboardingComplete()
                             onOnboardingComplete()
                         }
                     },
@@ -182,7 +194,7 @@ fun OnboardingScreen(
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Text(
-                        text = if (pagerState.currentPage < pages.size - 1) "下一步" else "开始使用",
+                        text = if (pagerState.currentPage < pageCount - 1) "下一步" else "开始使用",
                         style = MaterialTheme.typography.titleMedium
                     )
                 }
@@ -191,6 +203,24 @@ fun OnboardingScreen(
             }
         }
     }
+}
+
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun OnboardingScreen(
+    onOnboardingComplete: () -> Unit,
+    viewModel: OnboardingViewModel = hiltViewModel()
+) {
+    OnboardingScreenContent(
+        currentPage = 0,
+        pageCount = pages.size,
+        onPageChange = { /* Screen-level side effects could go here */ },
+        onOnboardingComplete = {
+            viewModel.onOnboardingComplete()
+            onOnboardingComplete()
+        }
+    )
 }
 
 // ===== Preview =====
@@ -211,6 +241,11 @@ fun OnboardingScreen(
 @Composable
 private fun OnboardingScreenPreview() {
     AiTutorTheme {
-        OnboardingScreen(onOnboardingComplete = {})
+        OnboardingScreenContent(
+            currentPage = 0,
+            pageCount = 3,
+            onPageChange = {},
+            onOnboardingComplete = {}
+        )
     }
 }

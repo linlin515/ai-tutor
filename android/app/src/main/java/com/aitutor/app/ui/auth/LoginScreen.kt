@@ -26,23 +26,25 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
-@Composable
-fun LoginScreen(
-    viewModel: LoginViewModel = hiltViewModel(),
-    onLoginSuccess: () -> Unit = {}) {
-    val state = viewModel.uiState
-    val focusManager = LocalFocusManager.current
-    var passwordVisible by remember { mutableStateOf(false) }
+// ===== Content composable (pure UI, no ViewModel) =====
 
-    LaunchedEffect(state.isSuccess) {
-        if (state.isSuccess) {
-            onLoginSuccess()
-        }
-    }
+@Composable
+fun LoginScreenContent(
+    state: LoginUiState,
+    passwordVisible: Boolean,
+    onPhoneChange: (String) -> Unit,
+    onEmailChange: (String) -> Unit,
+    onPasswordChange: (String) -> Unit,
+    onPasswordVisibilityToggle: () -> Unit,
+    onSubmit: () -> Unit,
+    onToggleMode: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusManager = LocalFocusManager.current
 
     Scaffold { padding ->
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(horizontal = 32.dp),
@@ -51,7 +53,7 @@ fun LoginScreen(
         ) {
             // Logo
             Text(
-                text = "📚",
+                text = "\uD83D\uDCDA",
                 fontSize = 64.sp
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -73,7 +75,7 @@ fun LoginScreen(
             // Phone input
             OutlinedTextField(
                 value = state.phone,
-                onValueChange = { viewModel.updatePhone(it) },
+                onValueChange = onPhoneChange,
                 label = { Text("手机号") },
                 placeholder = { Text("请输入11位手机号") },
                 singleLine = true,
@@ -94,7 +96,7 @@ fun LoginScreen(
             if (state.isRegister) {
                 OutlinedTextField(
                     value = state.email,
-                    onValueChange = { viewModel.updateEmail(it) },
+                    onValueChange = onEmailChange,
                     label = { Text("邮箱（选填）") },
                     placeholder = { Text("请输入邮箱地址") },
                     singleLine = true,
@@ -114,13 +116,13 @@ fun LoginScreen(
             // Password input
             OutlinedTextField(
                 value = state.password,
-                onValueChange = { viewModel.updatePassword(it) },
+                onValueChange = onPasswordChange,
                 label = { Text("密码") },
                 placeholder = { Text("请输入6-20位密码") },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 trailingIcon = {
-                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                    IconButton(onClick = onPasswordVisibilityToggle) {
                         Icon(
                             imageVector = if (passwordVisible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
                             contentDescription = if (passwordVisible) "隐藏密码" else "显示密码"
@@ -134,7 +136,7 @@ fun LoginScreen(
                 keyboardActions = KeyboardActions(
                     onDone = {
                         focusManager.clearFocus()
-                        viewModel.submit()
+                        onSubmit()
                     }
                 ),
                 modifier = Modifier.fillMaxWidth(),
@@ -157,7 +159,7 @@ fun LoginScreen(
 
             // Submit button
             Button(
-                onClick = { viewModel.submit() },
+                onClick = onSubmit,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(50.dp),
@@ -184,11 +186,41 @@ fun LoginScreen(
                 text = if (state.isRegister) "已有账号？去登录" else "没有账号？去注册",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.clickable { viewModel.toggleMode() }
+                modifier = Modifier.clickable { onToggleMode() }
             )
         }
     }
 }
+
+// ===== Screen composable (bridges ViewModel -> Content) =====
+
+@Composable
+fun LoginScreen(
+    viewModel: LoginViewModel = hiltViewModel(),
+    onLoginSuccess: () -> Unit = {}
+) {
+    val state = viewModel.uiState
+    var passwordVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.isSuccess) {
+        if (state.isSuccess) {
+            onLoginSuccess()
+        }
+    }
+
+    LoginScreenContent(
+        state = state,
+        passwordVisible = passwordVisible,
+        onPhoneChange = viewModel::updatePhone,
+        onEmailChange = viewModel::updateEmail,
+        onPasswordChange = viewModel::updatePassword,
+        onPasswordVisibilityToggle = { passwordVisible = !passwordVisible },
+        onSubmit = viewModel::submit,
+        onToggleMode = viewModel::toggleMode
+    )
+}
+
+// ===== Preview =====
 
 @Preview(
     name = "登录 预览",
@@ -207,6 +239,15 @@ fun LoginScreen(
 @Composable
 private fun PreviewLoginScreen() {
     AiTutorTheme {
-        LoginScreen()
+        LoginScreenContent(
+            state = LoginUiState(phone = "13800138000", password = "123456", isRegister = false),
+            passwordVisible = false,
+            onPhoneChange = {},
+            onEmailChange = {},
+            onPasswordChange = {},
+            onPasswordVisibilityToggle = {},
+            onSubmit = {},
+            onToggleMode = {}
+        )
     }
 }

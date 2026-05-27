@@ -47,49 +47,41 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI, stateless) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(
-    conversationId: Long? = null,
-    onNavigateToCamera: () -> Unit = {},
-    onNavigateToProfile: () -> Unit = {},
-    viewModel: ChatViewModel = hiltViewModel()
+fun ChatScreenContent(
+    state: ChatUiState,
+    showVoicePanel: Boolean,
+    showModeSelector: Boolean,
+    onInputTextChange: (String) -> Unit,
+    onSendMessage: () -> Unit,
+    onVoiceClick: () -> Unit,
+    onNavigateToCamera: () -> Unit,
+    onNavigateToProfile: () -> Unit,
+    onToggleConversationSheet: () -> Unit,
+    onSelectConversation: (Long) -> Unit,
+    onDeleteConversation: (Long) -> Unit,
+    onCreateNewConversation: () -> Unit,
+    onSearchKeywordChange: (String) -> Unit,
+    onDismissConversationSheet: () -> Unit,
+    onSetChatMode: (ChatMode) -> Unit,
+    onSetDifficultyLevel: (String) -> Unit,
+    onToggleDifficultySwitcher: () -> Unit,
+    onToggleAgentSwitch: () -> Unit,
+    onToggleAgentMode: () -> Unit,
+    onRetrySend: () -> Unit,
+    onSpeakText: (String) -> Unit,
+    onCopyMessage: (String) -> Unit,
+    onToggleFavorite: (Long) -> Unit,
+    onSetFeedbackTarget: (Long) -> Unit,
+    onSubmitFeedback: (Long, Boolean) -> Unit,
+    onDismissVoicePanel: () -> Unit,
+    onDismissModeSelector: () -> Unit,
+    onToggleModeSelector: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val state = viewModel.uiState
     val listState = rememberLazyListState()
-    var showVoicePanel by remember { mutableStateOf(false) }
-    var showModeSelector by remember { mutableStateOf(false) }
-    val context = LocalContext.current
-
-    // RECORD_AUDIO runtime permission
-    var hasAudioPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context, Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    val audioPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        hasAudioPermission = granted
-        if (granted) showVoicePanel = true
-    }
-
-    fun handleVoiceClick() {
-        if (hasAudioPermission) {
-            showVoicePanel = !showVoicePanel
-        } else {
-            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
-
-    // Select conversation if provided
-    LaunchedEffect(conversationId) {
-        if (conversationId != null && conversationId > 0) {
-            viewModel.selectConversation(conversationId)
-        }
-    }
 
     // Auto scroll to bottom on new messages
     LaunchedEffect(state.messages.size, state.streamingContent) {
@@ -111,13 +103,13 @@ fun ChatScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = { viewModel.toggleConversationSheet() }) {
+                    IconButton(onClick = onToggleConversationSheet) {
                         Icon(Icons.Default.Menu, contentDescription = "会话列表")
                     }
                 },
                 actions = {
                     // Teaching mode toggle (F42)
-                    IconButton(onClick = { showModeSelector = !showModeSelector }) {
+                    IconButton(onClick = onToggleModeSelector) {
                         Icon(
                             imageVector = when (state.chatMode) {
                                 ChatMode.ASSISTANT -> Icons.Default.AutoAwesome
@@ -132,7 +124,7 @@ fun ChatScreen(
                     }
 
                     // Difficulty level button (F41)
-                    IconButton(onClick = { viewModel.toggleDifficultySwitcher() }) {
+                    IconButton(onClick = onToggleDifficultySwitcher) {
                         Icon(
                             Icons.Default.Tune,
                             contentDescription = "讲解难度",
@@ -143,7 +135,7 @@ fun ChatScreen(
                     }
 
                     // v2.0 Agent: Agent 模式切换按钮
-                    IconButton(onClick = { viewModel.toggleAgentSwitch() }) {
+                    IconButton(onClick = onToggleAgentSwitch) {
                         Icon(
                             imageVector = Icons.Default.Psychology,
                             contentDescription = "Agent 模式",
@@ -153,7 +145,7 @@ fun ChatScreen(
                         )
                     }
 
-                    IconButton(onClick = { viewModel.createNewConversation() }) {
+                    IconButton(onClick = onCreateNewConversation) {
                         Icon(Icons.Default.Add, contentDescription = "新建对话")
                     }
                     IconButton(onClick = onNavigateToProfile) {
@@ -188,8 +180,8 @@ fun ChatScreen(
                             TeachingModeToggle(
                                 currentMode = state.chatMode,
                                 onModeChange = { mode ->
-                                    viewModel.setChatMode(mode)
-                                    showModeSelector = false
+                                    onSetChatMode(mode)
+                                    onDismissModeSelector()
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -207,7 +199,7 @@ fun ChatScreen(
                         DifficultySwitcher(
                             currentLevel = state.difficultyLevel,
                             onLevelChange = { level ->
-                                viewModel.setDifficultyLevel(level)
+                                onSetDifficultyLevel(level)
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -225,7 +217,7 @@ fun ChatScreen(
                     ) {
                         AgentSwitch(
                             enabled = state.agentEnabled,
-                            onToggle = { viewModel.toggleAgentMode() },
+                            onToggle = { onToggleAgentMode() },
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -233,9 +225,9 @@ fun ChatScreen(
 
                 ChatInputBar(
                     inputText = state.inputText,
-                    onTextChange = { viewModel.updateInputText(it) },
-                    onSend = { viewModel.sendMessage() },
-                    onVoiceClick = { handleVoiceClick() },
+                    onTextChange = onInputTextChange,
+                    onSend = onSendMessage,
+                    onVoiceClick = onVoiceClick,
                     onAddAttachment = onNavigateToCamera,
                     enabled = !state.isStreaming,
                     isOnline = state.isOnline
@@ -271,7 +263,7 @@ fun ChatScreen(
                         item(key = "teaching_banner") {
                             SocraticBanner(
                                 chatMode = state.chatMode,
-                                onDismiss = { viewModel.setChatMode(ChatMode.ASSISTANT) }
+                                onDismiss = { onSetChatMode(ChatMode.ASSISTANT) }
                             )
                         }
                     }
@@ -392,21 +384,21 @@ fun ChatScreen(
                                 message = message,
                                 onRetry = {
                                     if (message.status == MessageStatus.FAILED) {
-                                        viewModel.retrySend()
+                                        onRetrySend()
                                     }
                                 },
                                 onSpeak = {
                                     if (!message.isUser && message.content.isNotEmpty()) {
-                                        viewModel.speakText(message.content)
+                                        onSpeakText(message.content)
                                     }
                                 },
                                 // v2.5 F1: Long-press menu callbacks
-                                onCopy = { content -> viewModel.copyMessage(content) },
-                                onFavorite = { id -> viewModel.toggleFavorite(id) },
-                                onFeedback = { id -> viewModel.setFeedbackTarget(id) },
+                                onCopy = { content -> onCopyMessage(content) },
+                                onFavorite = { id -> onToggleFavorite(id) },
+                                onFeedback = { id -> onSetFeedbackTarget(id) },
                                 // v2.5 F2: Thumbs up/down
-                                onThumbsUp = { id -> viewModel.submitFeedback(id, true) },
-                                onThumbsDown = { id -> viewModel.submitFeedback(id, false) }
+                                onThumbsUp = { id -> onSubmitFeedback(id, true) },
+                                onThumbsDown = { id -> onSubmitFeedback(id, false) }
                             )
                         }
                     }
@@ -462,7 +454,7 @@ fun ChatScreen(
             if (showVoicePanel) {
                 VoiceInputBar(
                     voiceState = state.voiceState,
-                    onDismiss = { showVoicePanel = false }
+                    onDismiss = onDismissVoicePanel
                 )
             }
 
@@ -472,23 +464,97 @@ fun ChatScreen(
                     conversations = state.conversations,
                     currentConversationId = state.currentConversationId,
                     searchKeyword = state.searchKeyword,
-                    onSelectConversation = { id ->
-                        viewModel.selectConversation(id)
-                        viewModel.hideConversationSheet()
-                    },
-                    onDeleteConversation = { id ->
-                        viewModel.deleteConversation(id)
-                    },
-                    onNewConversation = {
-                        viewModel.createNewConversation()
-                        viewModel.hideConversationSheet()
-                    },
-                    onSearchKeywordChange = { viewModel.updateSearchKeyword(it) },
-                    onDismiss = { viewModel.hideConversationSheet() }
+                    onSelectConversation = onSelectConversation,
+                    onDeleteConversation = onDeleteConversation,
+                    onNewConversation = onCreateNewConversation,
+                    onSearchKeywordChange = onSearchKeywordChange,
+                    onDismiss = onDismissConversationSheet
                 )
             }
         }
     }
+}
+
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChatScreen(
+    conversationId: Long? = null,
+    onNavigateToCamera: () -> Unit = {},
+    onNavigateToProfile: () -> Unit = {},
+    viewModel: ChatViewModel = hiltViewModel()
+) {
+    val state = viewModel.uiState
+    var showVoicePanel by remember { mutableStateOf(false) }
+    var showModeSelector by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+
+    // RECORD_AUDIO runtime permission
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context, Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasAudioPermission = granted
+        if (granted) showVoicePanel = true
+    }
+
+    fun handleVoiceClick() {
+        if (hasAudioPermission) {
+            showVoicePanel = !showVoicePanel
+        } else {
+            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    // Select conversation if provided
+    LaunchedEffect(conversationId) {
+        if (conversationId != null && conversationId > 0) {
+            viewModel.selectConversation(conversationId)
+        }
+    }
+
+    ChatScreenContent(
+        state = state,
+        showVoicePanel = showVoicePanel,
+        showModeSelector = showModeSelector,
+        onInputTextChange = viewModel::updateInputText,
+        onSendMessage = viewModel::sendMessage,
+        onVoiceClick = { handleVoiceClick() },
+        onNavigateToCamera = onNavigateToCamera,
+        onNavigateToProfile = onNavigateToProfile,
+        onToggleConversationSheet = viewModel::toggleConversationSheet,
+        onSelectConversation = { id ->
+            viewModel.selectConversation(id)
+            viewModel.hideConversationSheet()
+        },
+        onDeleteConversation = viewModel::deleteConversation,
+        onCreateNewConversation = viewModel::createNewConversation,
+        onSearchKeywordChange = viewModel::updateSearchKeyword,
+        onDismissConversationSheet = viewModel::hideConversationSheet,
+        onSetChatMode = { mode ->
+            viewModel.setChatMode(mode)
+            showModeSelector = false
+        },
+        onSetDifficultyLevel = viewModel::setDifficultyLevel,
+        onToggleDifficultySwitcher = viewModel::toggleDifficultySwitcher,
+        onToggleAgentSwitch = viewModel::toggleAgentSwitch,
+        onToggleAgentMode = viewModel::toggleAgentMode,
+        onRetrySend = viewModel::retrySend,
+        onSpeakText = viewModel::speakText,
+        onCopyMessage = viewModel::copyMessage,
+        onToggleFavorite = viewModel::toggleFavorite,
+        onSetFeedbackTarget = viewModel::setFeedbackTarget,
+        onSubmitFeedback = viewModel::submitFeedback,
+        onDismissVoicePanel = { showVoicePanel = false },
+        onDismissModeSelector = { showModeSelector = false },
+        onToggleModeSelector = { showModeSelector = !showModeSelector }
+    )
 }
 
 // ===== Helper functions for step/Socratic content detection =====
@@ -664,4 +730,37 @@ private data class StepInfo(
 @Preview(name = "AI 对话 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "AI 对话 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewChatScreen() { AiTutorTheme { ChatScreen() } }
+private fun PreviewChatScreen() {
+    AiTutorTheme {
+        ChatScreenContent(
+            state = ChatUiState(conversations = emptyList(), messages = emptyList()),
+            showVoicePanel = false,
+            showModeSelector = false,
+            onInputTextChange = {},
+            onSendMessage = {},
+            onVoiceClick = {},
+            onNavigateToCamera = {},
+            onNavigateToProfile = {},
+            onToggleConversationSheet = {},
+            onSelectConversation = {},
+            onDeleteConversation = {},
+            onCreateNewConversation = {},
+            onSearchKeywordChange = {},
+            onDismissConversationSheet = {},
+            onSetChatMode = {},
+            onSetDifficultyLevel = {},
+            onToggleDifficultySwitcher = {},
+            onToggleAgentSwitch = {},
+            onToggleAgentMode = {},
+            onRetrySend = {},
+            onSpeakText = {},
+            onCopyMessage = {},
+            onToggleFavorite = {},
+            onSetFeedbackTarget = {},
+            onSubmitFeedback = { _, _ -> },
+            onDismissVoicePanel = {},
+            onDismissModeSelector = {},
+            onToggleModeSelector = {}
+        )
+    }
+}

@@ -8,7 +8,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -27,19 +26,23 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aitutor.app.ui.chat.components.MessageBubble
 import com.aitutor.app.ui.common.EmptyStateView
+import com.aitutor.app.domain.model.ChatMessage
 import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI, no ViewModel) =====
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FavoritesScreen(
-    onBack: () -> Unit = {},
-    viewModel: FavoritesViewModel = hiltViewModel()
+fun FavoritesScreenContent(
+    favorites: List<ChatMessage>,
+    onRemoveFavorite: (Long) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val favorites by viewModel.favorites.collectAsState()
-
     Scaffold(
+        modifier = modifier,
         topBar = {
             TopAppBar(
                 title = { Text("我的收藏") },
@@ -79,7 +82,7 @@ fun FavoritesScreen(
                 ) { message ->
                     MessageBubble(
                         message = message,
-                        onFavorite = { id -> viewModel.removeFavorite(id) }
+                        onFavorite = onRemoveFavorite
                     )
                 }
             }
@@ -87,7 +90,25 @@ fun FavoritesScreen(
     }
 }
 
+// ===== Screen composable (bridges ViewModel -> Content) =====
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FavoritesScreen(
+    onBack: () -> Unit = {},
+    viewModel: FavoritesViewModel = hiltViewModel()
+) {
+    val favorites by viewModel.favorites.collectAsState(initial = emptyList())
+
+    FavoritesScreenContent(
+        favorites = favorites,
+        onRemoveFavorite = viewModel::removeFavorite,
+        onBack = onBack
+    )
+}
+
 // ===== Preview =====
+
 @Preview(
     name = "收藏页 预览",
     showBackground = true,
@@ -105,6 +126,10 @@ fun FavoritesScreen(
 @Composable
 private fun FavoritesScreenPreview() {
     AiTutorTheme {
-        FavoritesScreen(onBack = {})
+        FavoritesScreenContent(
+            favorites = emptyList(),
+            onRemoveFavorite = {},
+            onBack = {}
+        )
     }
 }

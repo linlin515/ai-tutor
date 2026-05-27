@@ -25,29 +25,17 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReportExportScreen(
+fun ReportExportScreenContent(
+    state: ReportExportUiState,
+    onSetReportType: (ReportType) -> Unit,
+    onGenerateReport: () -> Unit,
+    onShare: () -> Unit,
     onBack: () -> Unit,
-    viewModel: ReportExportViewModel = hiltViewModel()
+    modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-    val context = LocalContext.current
-
-    LaunchedEffect(uiState.shareIntent) {
-        uiState.shareIntent?.let { intent ->
-            context.startActivity(Intent.createChooser(intent, "分享学习报告"))
-            viewModel.resetState()
-        }
-    }
-
-    LaunchedEffect(uiState.errorMessage) {
-        uiState.errorMessage?.let { msg ->
-            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
-            viewModel.dismissError()
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -112,14 +100,14 @@ fun ReportExportScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 FilterChip(
-                    selected = uiState.reportType == ReportType.WEEKLY,
-                    onClick = { viewModel.setReportType(ReportType.WEEKLY) },
+                    selected = state.reportType == ReportType.WEEKLY,
+                    onClick = { onSetReportType(ReportType.WEEKLY) },
                     label = { Text("📅 周报") },
                     modifier = Modifier.weight(1f)
                 )
                 FilterChip(
-                    selected = uiState.reportType == ReportType.MONTHLY,
-                    onClick = { viewModel.setReportType(ReportType.MONTHLY) },
+                    selected = state.reportType == ReportType.MONTHLY,
+                    onClick = { onSetReportType(ReportType.MONTHLY) },
                     label = { Text("📅 月报") },
                     modifier = Modifier.weight(1f)
                 )
@@ -169,9 +157,9 @@ fun ReportExportScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Generate button
-            if (!uiState.isLoading) {
+            if (!state.isLoading) {
                 Button(
-                    onClick = { viewModel.generateReport() },
+                    onClick = onGenerateReport,
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
@@ -188,13 +176,9 @@ fun ReportExportScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 // Share button (shown after PDF is generated)
-                if (uiState.pdfUri != null) {
+                if (state.pdfUri != null) {
                     OutlinedButton(
-                        onClick = {
-                            uiState.shareIntent?.let { intent ->
-                                context.startActivity(Intent.createChooser(intent, "分享学习报告"))
-                            }
-                        },
+                        onClick = onShare,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
@@ -225,7 +209,7 @@ fun ReportExportScreen(
                         CircularProgressIndicator()
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = uiState.progressMessage,
+                            text = state.progressMessage,
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -264,6 +248,43 @@ fun ReportExportScreen(
     }
 }
 
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReportExportScreen(
+    onBack: () -> Unit,
+    viewModel: ReportExportViewModel = hiltViewModel()
+) {
+    val uiState by viewModel.uiState.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(uiState.shareIntent) {
+        uiState.shareIntent?.let { intent ->
+            context.startActivity(Intent.createChooser(intent, "分享学习报告"))
+            viewModel.resetState()
+        }
+    }
+
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { msg ->
+            Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+            viewModel.dismissError()
+        }
+    }
+
+    ReportExportScreenContent(
+        state = uiState,
+        onSetReportType = viewModel::setReportType,
+        onGenerateReport = viewModel::generateReport,
+        onShare = {
+            uiState.shareIntent?.let { intent ->
+                context.startActivity(Intent.createChooser(intent, "分享学习报告"))
+            }
+        },
+        onBack = onBack
+    )
+}
+
 // ===== Preview =====
 @Preview(
     name = "报告导出 预览",
@@ -282,6 +303,12 @@ fun ReportExportScreen(
 @Composable
 private fun ReportExportScreenPreview() {
     AiTutorTheme {
-        ReportExportScreen(onBack = {})
+        ReportExportScreenContent(
+            state = ReportExportUiState(isLoading = false),
+            onSetReportType = {},
+            onGenerateReport = {},
+            onShare = {},
+            onBack = {}
+        )
     }
 }

@@ -18,22 +18,23 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ProfileScreen(
+fun ProfileScreenContent(
+    state: ProfileUiState,
+    showLogoutDialog: Boolean,
+    onUpdateNickname: (String) -> Unit,
+    onUpdateGrade: (String) -> Unit,
+    onStartEditing: () -> Unit,
+    onCancelEditing: () -> Unit,
+    onSaveProfile: () -> Unit,
     onLogout: () -> Unit,
+    onShowLogoutDialog: () -> Unit,
+    onDismissLogoutDialog: () -> Unit,
     onBack: () -> Unit,
-    viewModel: ProfileViewModel = hiltViewModel()
+    modifier: Modifier = Modifier
 ) {
-    val state = viewModel.uiState
-    var showLogoutDialog by remember { mutableStateOf(false) }
-
-    LaunchedEffect(state.isLoggingOut) {
-        if (state.isLoggingOut) {
-            onLogout()
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -77,14 +78,14 @@ fun ProfileScreen(
                 // Edit mode
                 OutlinedTextField(
                     value = state.editNickname,
-                    onValueChange = { viewModel.updateNickname(it) },
+                    onValueChange = onUpdateNickname,
                     label = { Text("昵称") },
                     modifier = Modifier.fillMaxWidth()
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 OutlinedTextField(
                     value = state.editGrade,
-                    onValueChange = { viewModel.updateGrade(it) },
+                    onValueChange = onUpdateGrade,
                     label = { Text("年级") },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -94,13 +95,13 @@ fun ProfileScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     OutlinedButton(
-                        onClick = { viewModel.cancelEditing() },
+                        onClick = onCancelEditing,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("取消")
                     }
                     Button(
-                        onClick = { viewModel.saveProfile() },
+                        onClick = onSaveProfile,
                         modifier = Modifier.weight(1f),
                         enabled = !state.isLoading
                     ) {
@@ -158,7 +159,7 @@ fun ProfileScreen(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(
-                    onClick = { viewModel.startEditing() },
+                    onClick = onStartEditing,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Edit, contentDescription = null)
@@ -170,7 +171,7 @@ fun ProfileScreen(
 
                 // Logout button
                 OutlinedButton(
-                    onClick = { showLogoutDialog = true },
+                    onClick = onShowLogoutDialog,
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.outlinedButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
@@ -186,27 +187,57 @@ fun ProfileScreen(
         // Logout confirm dialog
         if (showLogoutDialog) {
             AlertDialog(
-                onDismissRequest = { showLogoutDialog = false },
+                onDismissRequest = onDismissLogoutDialog,
                 title = { Text("退出登录") },
                 text = { Text("确定要退出登录吗？退出后需要重新登录才能使用。") },
                 confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showLogoutDialog = false
-                            viewModel.logout()
-                        }
-                    ) {
+                    TextButton(onClick = onLogout) {
                         Text("确定退出")
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showLogoutDialog = false }) {
+                    TextButton(onClick = onDismissLogoutDialog) {
                         Text("取消")
                     }
                 }
             )
         }
     }
+}
+
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ProfileScreen(
+    onLogout: () -> Unit,
+    onBack: () -> Unit,
+    viewModel: ProfileViewModel = hiltViewModel()
+) {
+    val state = viewModel.uiState
+    var showLogoutDialog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.isLoggingOut) {
+        if (state.isLoggingOut) {
+            onLogout()
+        }
+    }
+
+    ProfileScreenContent(
+        state = state,
+        showLogoutDialog = showLogoutDialog,
+        onUpdateNickname = viewModel::updateNickname,
+        onUpdateGrade = viewModel::updateGrade,
+        onStartEditing = viewModel::startEditing,
+        onCancelEditing = viewModel::cancelEditing,
+        onSaveProfile = viewModel::saveProfile,
+        onLogout = {
+            showLogoutDialog = false
+            viewModel.logout()
+        },
+        onShowLogoutDialog = { showLogoutDialog = true },
+        onDismissLogoutDialog = { showLogoutDialog = false },
+        onBack = onBack
+    )
 }
 
 // ===== Preview =====
@@ -227,6 +258,18 @@ fun ProfileScreen(
 @Composable
 private fun ProfileScreenPreview() {
     AiTutorTheme {
-        ProfileScreen(onLogout = {}, onBack = {})
+        ProfileScreenContent(
+            state = ProfileUiState(isLoading = true),
+            showLogoutDialog = false,
+            onUpdateNickname = {},
+            onUpdateGrade = {},
+            onStartEditing = {},
+            onCancelEditing = {},
+            onSaveProfile = {},
+            onLogout = {},
+            onShowLogoutDialog = {},
+            onDismissLogoutDialog = {},
+            onBack = {}
+        )
     }
 }

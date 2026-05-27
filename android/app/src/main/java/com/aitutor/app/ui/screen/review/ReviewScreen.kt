@@ -19,14 +19,20 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReviewScreen(
-    viewModel: ReviewViewModel = hiltViewModel(),
-    onBack: () -> Unit = {}
+fun ReviewScreenContent(
+    state: ReviewUiState,
+    onStartReview: () -> Unit,
+    onToggleAnswer: () -> Unit,
+    onMarkCorrect: () -> Unit,
+    onMarkIncorrect: () -> Unit,
+    onDeleteItem: () -> Unit,
+    onSelectSubject: (String) -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -44,37 +50,37 @@ fun ReviewScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (uiState.isLoading) {
+            if (state.isLoading) {
                 Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator()
                 }
-            } else if (uiState.currentReviewIndex < 0) {
+            } else if (state.currentReviewIndex < 0) {
                 // Home / selection screen
                 ReviewHomeContent(
-                    dueCount = uiState.dueCount,
-                    items = uiState.items,
-                    onStartReview = { viewModel.startReview() },
-                    onDeleteItem = { id -> viewModel.deleteItem() },
-                    filterSubjects = uiState.filterSubjects,
-                    selectedSubject = uiState.selectedSubject,
-                    onSubjectChange = { viewModel.selectSubject(it) }
+                    dueCount = state.dueCount,
+                    items = state.items,
+                    onStartReview = onStartReview,
+                    onDeleteItem = { onDeleteItem() },
+                    filterSubjects = state.filterSubjects,
+                    selectedSubject = state.selectedSubject,
+                    onSubjectChange = onSelectSubject
                 )
             } else {
                 // Active review
-                val currentItem = uiState.items.getOrNull(uiState.currentReviewIndex)
+                val currentItem = state.items.getOrNull(state.currentReviewIndex)
                 if (currentItem != null) {
                     ReviewCard(
                         item = currentItem,
-                        index = uiState.currentReviewIndex + 1,
-                        total = uiState.items.size,
-                        showAnswer = uiState.showAnswer,
-                        onToggleAnswer = { viewModel.toggleAnswer() },
-                        onCorrect = { viewModel.markCorrect() },
-                        onIncorrect = { viewModel.markIncorrect() },
-                        onDelete = { viewModel.deleteItem() }
+                        index = state.currentReviewIndex + 1,
+                        total = state.items.size,
+                        showAnswer = state.showAnswer,
+                        onToggleAnswer = onToggleAnswer,
+                        onCorrect = onMarkCorrect,
+                        onIncorrect = onMarkIncorrect,
+                        onDelete = onDeleteItem
                     )
                 }
             }
@@ -219,6 +225,27 @@ private fun ReviewHomeContent(
     }
 }
 
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReviewScreen(
+    viewModel: ReviewViewModel = hiltViewModel(),
+    onBack: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    ReviewScreenContent(
+        state = uiState,
+        onStartReview = viewModel::startReview,
+        onToggleAnswer = viewModel::toggleAnswer,
+        onMarkCorrect = viewModel::markCorrect,
+        onMarkIncorrect = viewModel::markIncorrect,
+        onDeleteItem = viewModel::deleteItem,
+        onSelectSubject = viewModel::selectSubject,
+        onBack = onBack
+    )
+}
+
 private fun formatSubject(key: String): String = when (key) {
     "all" -> "全部"
     "math" -> "数学"
@@ -248,6 +275,15 @@ private fun formatSubject(key: String): String = when (key) {
 @Composable
 private fun ReviewScreenPreview() {
     AiTutorTheme {
-        ReviewScreen(onBack = {})
+        ReviewScreenContent(
+            state = ReviewUiState(isLoading = true),
+            onStartReview = {},
+            onToggleAnswer = {},
+            onMarkCorrect = {},
+            onMarkIncorrect = {},
+            onDeleteItem = {},
+            onSelectSubject = {},
+            onBack = {}
+        )
     }
 }

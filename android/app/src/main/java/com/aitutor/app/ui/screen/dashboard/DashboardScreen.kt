@@ -21,15 +21,17 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI) =====
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DashboardScreen(
-    viewModel: DashboardViewModel = hiltViewModel(),
-    onNavigateToQuiz: () -> Unit = {},
-    onNavigateToWrongAnswers: () -> Unit = {}
+fun DashboardScreenContent(
+    state: DashboardUiState,
+    onNavigateToQuiz: () -> Unit,
+    onNavigateToWrongAnswers: () -> Unit,
+    onTrendDaysChange: (Int) -> Unit,
+    onSubjectSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val uiState by viewModel.uiState.collectAsState()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -42,10 +44,10 @@ fun DashboardScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (uiState.isLoading && uiState.isEmpty) {
+            if (state.isLoading && state.isEmpty) {
                 // Skeleton loading state
                 DashboardSkeleton()
-            } else if (uiState.isEmpty && !uiState.isLoading) {
+            } else if (state.isEmpty && !state.isLoading) {
                 EmptyStateView(
                     title = "开始学习吧！",
                     subtitle = "去聊天或解题，这里将展示你的学习统计数据。",
@@ -60,19 +62,19 @@ fun DashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Stats overview
-                    StatsOverviewCard(stats = uiState.stats)
+                    StatsOverviewCard(stats = state.stats)
 
                     // P1-5: Wrong answer entry card
                     WrongAnswerEntryCard(
-                        count = uiState.wrongAnswerCount,
+                        count = state.wrongAnswerCount,
                         onClick = onNavigateToWrongAnswers
                     )
 
                     // Trend chart
                     TrendChart(
-                        trends = uiState.trends,
-                        selectedDays = uiState.trendDays,
-                        onDaysChange = { viewModel.setTrendDays(it) }
+                        trends = state.trends,
+                        selectedDays = state.trendDays,
+                        onDaysChange = onTrendDaysChange
                     )
 
                     // Knowledge graph section header
@@ -88,8 +90,8 @@ fun DashboardScreen(
                     ) {
                         listOf("全部", "数学", "物理", "化学", "生物", "语文", "英语").forEach { subject ->
                             FilterChip(
-                                selected = uiState.selectedSubject == getSubjectKey(subject),
-                                onClick = { viewModel.selectSubject(getSubjectKey(subject)) },
+                                selected = state.selectedSubject == getSubjectKey(subject),
+                                onClick = { onSubjectSelect(getSubjectKey(subject)) },
                                 label = { Text(subject, style = MaterialTheme.typography.labelSmall) }
                             )
                         }
@@ -97,7 +99,7 @@ fun DashboardScreen(
 
                     // Knowledge graph
                     KnowledgeGraph(
-                        nodes = uiState.knowledgeNodes,
+                        nodes = state.knowledgeNodes,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(250.dp)
@@ -106,18 +108,18 @@ fun DashboardScreen(
                     // F46 游戏化数据展示
                     // 连胜指示器
                     StreakIndicator(
-                        streak = uiState.streak
+                        streak = state.streak
                     )
 
                     // 成就徽章区
                     AchievementGrid(
-                        achievements = uiState.achievements
+                        achievements = state.achievements
                     )
 
                     // 排行榜
                     LeaderboardView(
-                        rankings = uiState.rankings,
-                        isLoading = uiState.isLoading
+                        rankings = state.rankings,
+                        isLoading = state.isLoading
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -125,6 +127,25 @@ fun DashboardScreen(
             }
         }
     }
+}
+
+// ===== Screen composable (ViewModel bridge) =====
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DashboardScreen(
+    viewModel: DashboardViewModel = hiltViewModel(),
+    onNavigateToQuiz: () -> Unit = {},
+    onNavigateToWrongAnswers: () -> Unit = {}
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    DashboardScreenContent(
+        state = uiState,
+        onNavigateToQuiz = onNavigateToQuiz,
+        onNavigateToWrongAnswers = onNavigateToWrongAnswers,
+        onTrendDaysChange = viewModel::setTrendDays,
+        onSubjectSelect = viewModel::selectSubject
+    )
 }
 
 // ===== Preview =====
@@ -145,7 +166,13 @@ fun DashboardScreen(
 @Composable
 private fun PreviewDashboardScreen() {
     AiTutorTheme {
-        DashboardScreen(onNavigateToQuiz = {}, onNavigateToWrongAnswers = {})
+        DashboardScreenContent(
+            state = DashboardUiState(isLoading = true),
+            onNavigateToQuiz = {},
+            onNavigateToWrongAnswers = {},
+            onTrendDaysChange = {},
+            onSubjectSelect = {}
+        )
     }
 }
 

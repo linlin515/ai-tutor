@@ -20,14 +20,18 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI, no ViewModel) =====
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FlashcardScreen(
-    viewModel: FlashcardViewModel = hiltViewModel(),
-    onNavigateBack: () -> Unit = {}
+fun FlashcardScreenContent(
+    state: FlashcardViewModel.UiState,
+    isFlipped: Boolean,
+    onFlip: () -> Unit,
+    onReviewCard: (String, String) -> Unit,
+    onNavigateBack: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    val state by viewModel.uiState.collectAsState()
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -39,7 +43,7 @@ fun FlashcardScreen(
         }
     ) { padding ->
         Box(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding),
             contentAlignment = Alignment.Center
@@ -54,7 +58,6 @@ fun FlashcardScreen(
                 }
                 is FlashcardViewModel.UiState.Cards -> {
                     val card = s.cards[s.currentIndex]
-                    var isFlipped by remember { mutableStateOf(false) }
                     val rotation by animateFloatAsState(
                         targetValue = if (isFlipped) 180f else 0f,
                         animationSpec = tween(300),
@@ -78,7 +81,7 @@ fun FlashcardScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .heightIn(min = 260.dp)
-                                .clickable { isFlipped = !isFlipped },
+                                .clickable { onFlip() },
                             shape = RoundedCornerShape(16.dp),
                             elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                         ) {
@@ -114,12 +117,12 @@ fun FlashcardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             FilledTonalButton(
-                                onClick = { viewModel.reviewCard(card.id, "unfamiliar") }
+                                onClick = { onReviewCard(card.id, "unfamiliar") }
                             ) {
                                 Text("← 不熟练")
                             }
                             Button(
-                                onClick = { viewModel.reviewCard(card.id, "mastered") }
+                                onClick = { onReviewCard(card.id, "mastered") }
                             ) {
                                 Text("已掌握 →")
                             }
@@ -161,7 +164,28 @@ fun FlashcardScreen(
     }
 }
 
+// ===== Screen composable (bridges ViewModel -> Content) =====
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FlashcardScreen(
+    viewModel: FlashcardViewModel = hiltViewModel(),
+    onNavigateBack: () -> Unit = {}
+) {
+    val state by viewModel.uiState.collectAsState()
+    var isFlipped by remember { mutableStateOf(false) }
+
+    FlashcardScreenContent(
+        state = state,
+        isFlipped = isFlipped,
+        onFlip = { isFlipped = !isFlipped },
+        onReviewCard = viewModel::reviewCard,
+        onNavigateBack = onNavigateBack
+    )
+}
+
 // ===== Preview =====
+
 @Preview(
     name = "Flashcard 预览",
     showBackground = true,
@@ -179,6 +203,12 @@ fun FlashcardScreen(
 @Composable
 private fun FlashcardScreenPreview() {
     AiTutorTheme {
-        FlashcardScreen(onNavigateBack = {})
+        FlashcardScreenContent(
+            state = FlashcardViewModel.UiState.Loading,
+            isFlipped = false,
+            onFlip = {},
+            onReviewCard = { _, _ -> },
+            onNavigateBack = {}
+        )
     }
 }

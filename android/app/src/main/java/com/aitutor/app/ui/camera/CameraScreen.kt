@@ -45,6 +45,305 @@ import java.util.concurrent.Executors
 import android.content.res.Configuration
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== Content composable (pure UI, stateless) =====
+@Composable
+fun CameraScreenContent(
+    state: CameraUiState,
+    hasCameraPermission: Boolean,
+    ocrResult: String?,
+    isOcrProcessing: Boolean,
+    ocrBoxes: List<OcrBoundingBox>,
+    onRequestPermission: () -> Unit,
+    onRetake: () -> Unit,
+    onAnalyze: () -> Unit,
+    onNavigateToChat: (String) -> Unit,
+    onOcrBoxTap: (OcrBoundingBox) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+    ) {
+        if (!hasCameraPermission) {
+            // Permission denied
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    Icons.Default.CameraAlt,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "需要相机权限才能拍照解题",
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = onRequestPermission) {
+                    Text("授予权限")
+                }
+            }
+        } else if (state.showPreview) {
+            // Photo preview
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Show actual image preview using Coil
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (state.capturedImageUri != null) {
+                        AsyncImage(
+                            model = state.capturedImageUri,
+                            contentDescription = "拍摄的照片",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                }
+
+                // Subject selector (only when not yet analyzing)
+                if (!state.isAnalyzing && state.analysisResult == null) {
+                    SubjectSelector(
+                        selectedSubject = state.selectedSubject,
+                        onSubjectChanged = { /* handled by Screen */ },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (state.isAnalyzing) {
+                    if (state.isCompressing) {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("图片压缩中...")
+                    } else if (state.solveEvents.isNotEmpty()) {
+                        // Show live solve events
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(0.3f)
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "AI 分析中...",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            // Show latest OCR result
+                            val lastOcr = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Ocr>().lastOrNull()
+                            if (lastOcr != null) {
+                                Card(
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                                    )
+                                ) {
+                                    Column(modifier = Modifier.padding(8.dp)) {
+                                        Text(
+                                            text = "识别结果:",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = lastOcr.text.take(100) + if (lastOcr.text.length > 100) "..." else "",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+                                    }
+                                }
+                            }
+
+                            // Show step progress
+                            val currentStep = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>().lastOrNull()
+                            if (currentStep != null) {
+                                LinearProgressIndicator(
+                                    progress = { currentStep.step.toFloat() / currentStep.total.toFloat() },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(4.dp),
+                                    color = MaterialTheme.colorScheme.primary,
+                                    trackColor = MaterialTheme.colorScheme.surfaceVariant
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "步骤 ${currentStep.step}/${currentStep.total}: ${currentStep.title}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "正在生成解答...",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    } else {
+                        CircularProgressIndicator()
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("AI 分析中...")
+                    }
+                } else if (state.analysisResult != null) {
+                    // Analysis done
+                    Text(
+                        text = "分析完成！",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Show latest steps summary
+                    val steps = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>()
+                    if (steps.isNotEmpty()) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(0.2f)
+                                .padding(horizontal = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "解题步骤:",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            steps.forEach { step ->
+                                Text(
+                                    text = "步骤 ${step.step}/${step.total}: ${step.title}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+
+                    Button(onClick = {
+                        val convId = state.conversationId
+                        if (convId > 0) {
+                            onNavigateToChat("$convId")
+                        } else {
+                            onNavigateToChat("")
+                        }
+                    }) {
+                        Text("查看解答")
+                    }
+                } else if (state.errorMessage != null) {
+                    // Error state
+                    Text(
+                        text = state.errorMessage ?: "分析失败",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        OutlinedButton(onClick = onRetake) {
+                            Text("重拍")
+                        }
+                        Button(onClick = onAnalyze) {
+                            Text("重试")
+                        }
+                    }
+                } else {
+                    // OCR result preview (between subject selector and action buttons)
+                    if (isOcrProcessing || ocrResult != null) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surfaceVariant
+                            )
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(
+                                    text = "OCR 识别结果",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                if (isOcrProcessing) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        CircularProgressIndicator(
+                                            modifier = Modifier.size(16.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        Text(
+                                            text = "正在识别文字...",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                } else if (ocrResult != null) {
+                                    Text(
+                                        text = ocrResult!!,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        maxLines = 5,
+                                        overflow = TextOverflow.Ellipsis,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    // Action buttons
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        OutlinedButton(onClick = onRetake) {
+                            Text("重拍")
+                        }
+                        Button(onClick = onAnalyze) {
+                            Text("确认使用")
+                        }
+                    }
+                }
+            }
+        } else {
+            // Camera preview — simplified placeholder (actual CameraX is overlaid by Screen)
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Placeholder background for CameraX
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                )
+            }
+        }
+    }
+}
+
+// ===== Screen composable (ViewModel bridge, CameraX + ML Kit) =====
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalGetImage::class)
 @Composable
 fun CameraScreen(
@@ -141,275 +440,23 @@ fun CameraScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            if (!hasCameraPermission) {
-                // Permission denied
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(32.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        Icons.Default.CameraAlt,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "需要相机权限才能拍照解题",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(onClick = { permissionLauncher.launch(Manifest.permission.CAMERA) }) {
-                        Text("授予权限")
-                    }
-                }
-            } else if (state.showPreview) {
-                // Photo preview
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    // Show actual image preview using Coil
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (state.capturedImageUri != null) {
-                            AsyncImage(
-                                model = state.capturedImageUri,
-                                contentDescription = "拍摄的照片",
-                                modifier = Modifier.fillMaxSize(),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                    }
-
-                    // Subject selector (only when not yet analyzing)
-                    if (!state.isAnalyzing && state.analysisResult == null) {
-                        SubjectSelector(
-                            selectedSubject = state.selectedSubject,
-                            onSubjectChanged = { viewModel.onSubjectChanged(it) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp)
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                    }
-
-                    if (state.isAnalyzing) {
-                        if (state.isCompressing) {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("图片压缩中...")
-                        } else if (state.solveEvents.isNotEmpty()) {
-                            // Show live solve events
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(0.3f)
-                                    .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "AI 分析中...",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-
-                                // Show latest OCR result
-                                val lastOcr = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Ocr>().lastOrNull()
-                                if (lastOcr != null) {
-                                    Card(
-                                        shape = RoundedCornerShape(8.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
-                                        )
-                                    ) {
-                                        Column(modifier = Modifier.padding(8.dp)) {
-                                            Text(
-                                                text = "识别结果:",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = lastOcr.text.take(100) + if (lastOcr.text.length > 100) "..." else "",
-                                                style = MaterialTheme.typography.bodySmall
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Show step progress
-                                val currentStep = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>().lastOrNull()
-                                if (currentStep != null) {
-                                    LinearProgressIndicator(
-                                        progress = { currentStep.step.toFloat() / currentStep.total.toFloat() },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(4.dp),
-                                        color = MaterialTheme.colorScheme.primary,
-                                        trackColor = MaterialTheme.colorScheme.surfaceVariant
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "步骤 ${currentStep.step}/${currentStep.total}: ${currentStep.title}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "正在生成解答...",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        } else {
-                            CircularProgressIndicator()
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("AI 分析中...")
-                        }
-                    } else if (state.analysisResult != null) {
-                        // Analysis done
-                        Text(
-                            text = "分析完成！",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // Show latest steps summary
-                        val steps = state.solveEvents.filterIsInstance<com.aitutor.app.data.remote.dto.SolveEventUi.Step>()
-                        if (steps.isNotEmpty()) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .weight(0.2f)
-                                    .padding(horizontal = 16.dp),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = "解题步骤:",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                steps.forEach { step ->
-                                    Text(
-                                        text = "步骤 ${step.step}/${step.total}: ${step.title}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-                        }
-
-                        Button(onClick = {
-                            val convId = state.conversationId
-                            viewModel.resetState()
-                            if (convId > 0) {
-                                onNavigateToChat("$convId")
-                            } else {
-                                onNavigateToChat("")
-                            }
-                        }) {
-                            Text("查看解答")
-                        }
-                    } else if (state.errorMessage != null) {
-                        // Error state
-                        Text(
-                            text = state.errorMessage ?: "分析失败",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            OutlinedButton(onClick = { viewModel.retakePhoto() }) {
-                                Text("重拍")
-                            }
-                            Button(onClick = { viewModel.confirmPhoto() }) {
-                                Text("重试")
-                            }
-                        }
-                    } else {
-                        // OCR result preview (between subject selector and action buttons)
-                        if (isOcrProcessing || ocrResult != null) {
-                            Card(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                                )
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text(
-                                        text = "OCR 识别结果",
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    if (isOcrProcessing) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            CircularProgressIndicator(
-                                                modifier = Modifier.size(16.dp),
-                                                strokeWidth = 2.dp
-                                            )
-                                            Text(
-                                                text = "正在识别文字...",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    } else if (ocrResult != null) {
-                                        Text(
-                                            text = ocrResult!!,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            maxLines = 5,
-                                            overflow = TextOverflow.Ellipsis,
-                                            color = MaterialTheme.colorScheme.onSurface
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(8.dp))
-                        }
-
-                        // Action buttons
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
-                            OutlinedButton(onClick = { viewModel.retakePhoto() }) {
-                                Text("重拍")
-                            }
-                            Button(onClick = { viewModel.confirmPhoto() }) {
-                                Text("确认使用")
-                            }
-                        }
-                    }
-                }
+            if (!hasCameraPermission || state.showPreview) {
+                // Use Content composable for permission-denied and photo-preview states
+                CameraScreenContent(
+                    state = state,
+                    hasCameraPermission = hasCameraPermission,
+                    ocrResult = ocrResult,
+                    isOcrProcessing = isOcrProcessing,
+                    ocrBoxes = viewModel.ocrResults,
+                    onRequestPermission = { permissionLauncher.launch(Manifest.permission.CAMERA) },
+                    onRetake = { viewModel.retakePhoto() },
+                    onAnalyze = { viewModel.confirmPhoto() },
+                    onNavigateToChat = onNavigateToChat,
+                    onOcrBoxTap = { /* viewModel.onOcrBoxTap(it) — not yet implemented */ },
+                    modifier = Modifier.fillMaxSize()
+                )
             } else {
-                // Camera preview
+                // Camera preview — inline CameraX setup (cannot be extracted to Content)
                 Box(modifier = Modifier.fillMaxSize()) {
                     // CameraX Preview + ImageCapture + ImageAnalysis (ML Kit OCR)
                     AndroidView(
@@ -731,4 +778,19 @@ private fun DrawScope.drawOcrOverlay(
 @androidx.compose.ui.tooling.preview.Preview(name = "拍照解题 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @androidx.compose.ui.tooling.preview.Preview(name = "拍照解题 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewCameraScreen() { AiTutorTheme { CameraScreen() } }
+private fun PreviewCameraScreen() {
+    AiTutorTheme {
+        CameraScreenContent(
+            state = CameraUiState(),
+            hasCameraPermission = false,
+            ocrResult = null,
+            isOcrProcessing = false,
+            ocrBoxes = emptyList(),
+            onRequestPermission = {},
+            onRetake = {},
+            onAnalyze = {},
+            onNavigateToChat = {},
+            onOcrBoxTap = {}
+        )
+    }
+}

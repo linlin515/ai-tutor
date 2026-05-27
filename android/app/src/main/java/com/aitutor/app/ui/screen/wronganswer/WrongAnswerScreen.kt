@@ -35,6 +35,27 @@ fun WrongAnswerScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
+    WrongAnswerScreenContent(
+        state = uiState,
+        onSelectSubject = viewModel::selectSubject,
+        onDeleteItem = viewModel::deleteItem,
+        onMarkMastered = viewModel::markMastered,
+        onClearError = viewModel::clearError,
+        onBack = onBack
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WrongAnswerScreenContent(
+    state: WrongAnswerUiState,
+    onSelectSubject: (String) -> Unit,
+    onDeleteItem: (String) -> Unit,
+    onMarkMastered: (String) -> Unit,
+    onClearError: () -> Unit,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -51,23 +72,23 @@ fun WrongAnswerScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier
+            modifier = modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
             // Subject filter chips
             SubjectFilterRow(
-                subjects = uiState.subjects,
-                selectedSubject = uiState.selectedSubject,
-                onSubjectSelected = { viewModel.selectSubject(it) }
+                subjects = state.subjects,
+                selectedSubject = state.selectedSubject,
+                onSubjectSelected = onSelectSubject
             )
 
             // Error snackbar
-            uiState.error?.let { error ->
+            state.error?.let { error ->
                 Snackbar(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
                     action = {
-                        TextButton(onClick = { viewModel.clearError() }) {
+                        TextButton(onClick = onClearError) {
                             Text("关闭")
                         }
                     }
@@ -78,7 +99,7 @@ fun WrongAnswerScreen(
 
             // Content
             when {
-                uiState.isLoading -> {
+                state.isLoading -> {
                     Box(
                         modifier = Modifier.fillMaxSize(),
                         contentAlignment = Alignment.Center
@@ -86,7 +107,7 @@ fun WrongAnswerScreen(
                         CircularProgressIndicator()
                     }
                 }
-                uiState.items.isEmpty() -> {
+                state.items.isEmpty() -> {
                     EmptyStateView(
                         title = "暂无错题",
                         subtitle = "答题错误的题目将会出现在这里",
@@ -102,13 +123,13 @@ fun WrongAnswerScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         items(
-                            items = uiState.items,
+                            items = state.items,
                             key = { it.id }
                         ) { item ->
                             WrongAnswerCard(
                                 item = item,
-                                onDelete = { viewModel.deleteItem(item.id) },
-                                onMarkMastered = { viewModel.markMastered(item.id) }
+                                onDelete = { onDeleteItem(item.id) },
+                                onMarkMastered = { onMarkMastered(item.id) }
                             )
                         }
                     }
@@ -391,6 +412,13 @@ private fun getReviewTimeColor(timestamp: Long): Color {
 @Composable
 private fun PreviewWrongAnswerScreen() {
     AiTutorTheme {
-        WrongAnswerScreen(onBack = {})
+        WrongAnswerScreenContent(
+            state = WrongAnswerUiState(isLoading = true),
+            onSelectSubject = {},
+            onDeleteItem = {},
+            onMarkMastered = {},
+            onClearError = {},
+            onBack = {}
+        )
     }
 }

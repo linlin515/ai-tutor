@@ -25,6 +25,8 @@ import android.content.res.Configuration
 import androidx.compose.ui.tooling.preview.Preview
 import com.aitutor.app.ui.theme.AiTutorTheme
 
+// ===== ViewModel (unchanged) =====
+
 @HiltViewModel
 class SplashViewModel @Inject constructor(
     private val tokenManager: TokenManager,
@@ -44,13 +46,53 @@ class SplashViewModel @Inject constructor(
     }
 }
 
+// ===== Content composable (pure UI, no ViewModel) =====
+
+@Composable
+fun SplashScreenContent(
+    alpha: Float,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.alpha(alpha)
+        ) {
+            Text(
+                text = "\uD83D\uDCDA",
+                fontSize = 72.sp
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "AI 学习助手",
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "随时随地，智能解答",
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+// ===== Screen composable (bridges ViewModel -> Content) =====
+
 @Composable
 fun SplashScreen(
     onNavigateToLogin: () -> Unit,
     onNavigateToMain: () -> Unit,
-    onNavigateToOnboarding: () -> Unit = {}
+    onNavigateToOnboarding: () -> Unit = {},
+    viewModel: SplashViewModel = hiltViewModel()
 ) {
-    val viewModel: SplashViewModel = hiltViewModel()
     var startAnimation by remember { mutableStateOf(false) }
     var navigationHandled by remember { mutableStateOf(false) }
 
@@ -87,39 +129,16 @@ fun SplashScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.alpha(alphaAnim.value)
-        ) {
-            Text(
-                text = "\uD83D\uDCDA",
-                fontSize = 72.sp
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = "AI 学习助手",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "随时随地，智能解答",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
+    SplashScreenContent(alpha = alphaAnim.value)
 }
 
 // ===== Preview =====
+
 @Preview(name = "启动屏 预览", showBackground = true, backgroundColor = 0xFF1C1B1F, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_NO)
 @Preview(name = "启动屏 预览 (深色)", showBackground = true, backgroundColor = 0xFFFEFBFF, showSystemUi = false, uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
-private fun PreviewSplashScreen() { AiTutorTheme { SplashScreen(onNavigateToLogin = {}, onNavigateToMain = {}) } }
+private fun PreviewSplashScreen() {
+    AiTutorTheme {
+        SplashScreenContent(alpha = 1f)
+    }
+}
